@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sonos spricht ausschliesslich unverschluesseltes HTTP auf Port 1400, und der
+  Speaker holt die Musikdatei per HTTP von diesem Handy ab. Seit Android 9 ist
+  Cleartext standardmaessig blockiert - ohne diese Ausnahme geht beides nicht.
+
+  Die Konfiguration kennt keine IP-Bereiche (CIDR), nur konkrete Hostnamen, und
+  die Adresse des Speakers steht vorher nicht fest. Deshalb Cleartext generell
+  erlaubt. Vertretbar, weil die App ausschliesslich mit Geraeten im eigenen LAN
+  spricht und keinerlei Daten nach draussen sendet.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

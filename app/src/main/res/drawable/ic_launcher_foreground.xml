@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Minimal: ein Punkt (die Quelle) und drei Wellen nach rechts (der Speaker). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#5BC8AF"
+        android:pathData="M38,48 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+
+    <path
+        android:strokeColor="#F2F2F0"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M53,38 A14,14 0 0,1 53,58" />
+    <path
+        android:strokeColor="#F2F2F0"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M62,31 A23,23 0 0,1 62,65" />
+    <path
+        android:strokeColor="#5BC8AF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M71,24 A32,32 0 0,1 71,72" />
+</vector>

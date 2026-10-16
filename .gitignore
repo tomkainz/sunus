@@ -1,0 +1,13 @@
+.gradle/
+.kotlin/
+build/
+*/build/
+local.properties
+.idea/
+*.iml
+captures/
+
+# Signierschluessel bleibt lokal
+keystore/
+*.jks
+*.keystore

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Sonos Live</string>
+    <string name="channel_live">Stream aktiv</string>
+    <string name="channel_pairing">Einrichtung</string>
+</resources>

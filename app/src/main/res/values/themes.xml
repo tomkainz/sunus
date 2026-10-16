@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose uebernimmt das Styling; das Android-Theme haelt nur den
+         Startbildschirm ruhig und blendet die Titelleiste aus. -->
+    <style name="Theme.SonosLive" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#0B0B0D</item>
+        <item name="android:statusBarColor">#0B0B0D</item>
+        <item name="android:navigationBarColor">#0B0B0D</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
