@@ -67,8 +67,7 @@ fun SonosLiveApp(
     onSelect: (Speaker) -> Unit,
     onAddManual: (String) -> Unit,
     onSetVolume: (Int) -> Unit,
-    onPair: (Int, String) -> Unit,
-    onOpenDevOptions: () -> Unit
+    onStartPairing: (Int?) -> Unit
 ) {
     val speakers by AppState.speakers.collectAsStateWithLifecycle()
     val selected by AppState.selected.collectAsStateWithLifecycle()
@@ -153,7 +152,7 @@ fun SonosLiveApp(
         message?.let { Snackbar(it, Modifier.align(Alignment.BottomCenter).padding(bottom = 150.dp)) }
 
         if (showMore) MoreSheet(mode, running, onAddManual) { showMore = false }
-        if (requestPairing) PairingDialog(onPair, onOpenDevOptions)
+        if (requestPairing) PairingDialog(onStartPairing)
     }
 }
 
@@ -391,40 +390,53 @@ private fun Hint(text: String) {
 // ---- Kopplung (Alle-Apps-Modus) -----------------------------------------
 
 @Composable
-private fun PairingDialog(onPair: (Int, String) -> Unit, onOpenDevOptions: () -> Unit) {
+private fun PairingDialog(onStartPairing: (Int?) -> Unit) {
     val c = MaterialTheme.colorScheme
     val busy by AppState.adbBusy.collectAsStateWithLifecycle()
     val adbMessage by AppState.adbMessage.collectAsStateWithLifecycle()
+    var manual by remember { mutableStateOf(false) }
     var port by remember { mutableStateOf("") }
-    var code by remember { mutableStateOf("") }
 
     Box(Modifier.fillMaxSize().background(Color(0xCC000000)).padding(20.dp), contentAlignment = Alignment.Center) {
         Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = c.surfaceContainerHigh) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text("Alle Apps einrichten", style = MaterialTheme.typography.titleMedium, color = c.onSurface)
-                Text("1. Entwickleroptionen > \"Kabelloses Debugging\" einschalten.\n" +
-                    "2. \"Gerät mit Kopplungscode koppeln\" antippen.\n" +
-                    "3. Code und Port (Zahl hinter dem Doppelpunkt) eintragen.",
+                Text("1. Auf „Kopplung starten“ tippen. Die Entwickleroptionen öffnen sich.\n" +
+                    "2. „Kabelloses Debugging“ einschalten, antippen und „Gerät mit Kopplungscode koppeln“ wählen.\n" +
+                    "3. Den Dialog offen lassen, die Benachrichtigungsleiste herunterziehen und bei „Sonos Live koppeln“ " +
+                    "den 6-stelligen Code eingeben.",
                     style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
-                TextButton(onClick = onOpenDevOptions) { Text("Entwickleroptionen öffnen") }
-                OutlinedTextField(value = port, onValueChange = { port = it.filter { ch -> ch.isDigit() } },
-                    label = { Text("Port") }, singleLine = true, shape = RoundedCornerShape(14.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = code, onValueChange = { code = it.filter { ch -> ch.isDigit() }.take(6) },
-                    label = { Text("Kopplungscode") }, singleLine = true, shape = RoundedCornerShape(14.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth())
+                Text("Den Port findet die App selbst. Sind die Entwickleroptionen noch versteckt: " +
+                    "Einstellungen > Über das Telefon > 7× auf „Build-Nummer“ tippen.",
+                    style = MaterialTheme.typography.labelSmall, color = c.onSurfaceVariant)
+
+                if (manual) {
+                    OutlinedTextField(
+                        value = port, onValueChange = { port = it.filter { ch -> ch.isDigit() }.take(5) },
+                        label = { Text("Port aus dem Kopplungsdialog") }, singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
                 adbMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = c.primary) }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { AppState.requestPairing.value = false }, enabled = !busy) { Text("Abbrechen") }
-                    Spacer(Modifier.width(8.dp))
-                    Button(onClick = { port.toIntOrNull()?.let { onPair(it, code) } },
-                        enabled = !busy && port.toIntOrNull() != null && code.length >= 6,
-                        colors = ButtonDefaults.buttonColors(containerColor = c.primary, contentColor = c.onPrimary)) {
+
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { manual = !manual }) {
+                        Text(if (manual) "Port automatisch" else "Port selbst eintragen",
+                            style = MaterialTheme.typography.labelSmall)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { AppState.requestPairing.value = false }) { Text("Schließen") }
+                    Spacer(Modifier.width(4.dp))
+                    Button(
+                        onClick = { onStartPairing(if (manual) port.toIntOrNull() else null) },
+                        enabled = !busy,
+                        colors = ButtonDefaults.buttonColors(containerColor = c.primary, contentColor = c.onPrimary)
+                    ) {
                         if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = c.onPrimary)
-                        else Text("Koppeln")
+                        else Text("Kopplung starten")
                     }
                 }
             }

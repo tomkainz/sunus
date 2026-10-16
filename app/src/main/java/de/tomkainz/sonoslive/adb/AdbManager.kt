@@ -16,10 +16,25 @@ import java.io.InputStream
  */
 object AdbManager {
 
-    /** Koppeln mit Code und Port aus den Entwickleroptionen (einmalig). */
-    fun pair(context: Context, port: Int, code: String): Boolean {
+    /**
+     * Koppeln mit dem Code aus dem Dialog "Geraet mit Kopplungscode koppeln".
+     * [host] kommt aus der mDNS-Suche; fehlt er, wird die eigene WLAN-Adresse
+     * genommen. Der Kopplungsdienst lauscht auf allen Schnittstellen.
+     */
+    fun pair(context: Context, host: String?, port: Int, code: String): Boolean {
         val manager = AdbKeyManager.getInstance(context)
-        return manager.pair(hostIp(context), port, code)
+        val candidates = listOfNotNull(host, hostIp(context)).distinct()
+        var lastError: Exception? = null
+        for (candidate in candidates) {
+            try {
+                if (manager.pair(candidate, port, code)) return true
+            } catch (e: java.io.IOException) {
+                // Verbindungsfehler: naechste Adresse probieren
+                lastError = e
+            }
+        }
+        lastError?.let { throw it }
+        return false
     }
 
     /** Verbindet sich mit dem lokalen ADB-TLS-Dienst (per mDNS gefunden). */

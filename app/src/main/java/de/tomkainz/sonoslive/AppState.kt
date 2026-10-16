@@ -46,35 +46,6 @@ object AppState {
         requestPairing.value = true
     }
 
-    /** Einmalige Kopplung fuer den Alle-Apps-Modus (Port + Code aus den Entwickleroptionen). */
-    fun pairAllApps(context: Context, port: Int, code: String) {
-        if (adbBusy.value) return
-        adbBusy.value = true
-        adbMessage.value = "Koppeln..."
-        scope.launch {
-            try {
-                val paired = de.tomkainz.sonoslive.adb.AdbManager.pair(context, port, code)
-                if (!paired) {
-                    adbMessage.value = "Kopplung fehlgeschlagen. Code und Port prüfen."
-                    return@launch
-                }
-                adbMessage.value = "Verbinde..."
-                val connected = de.tomkainz.sonoslive.adb.AdbManager.connect(context)
-                if (connected) {
-                    setAdbPaired(true)
-                    requestPairing.value = false
-                    adbMessage.value = "Bereit. Alle-Apps-Modus ist eingerichtet."
-                } else {
-                    adbMessage.value = "Gekoppelt, aber keine Verbindung. Kabelloses Debugging an?"
-                }
-            } catch (e: Exception) {
-                adbMessage.value = "Fehler: ${e.message}"
-            } finally {
-                adbBusy.value = false
-            }
-        }
-    }
-
     val running = MutableStateFlow(false)
     val status = MutableStateFlow("Bereit")
     val message = MutableStateFlow<String?>(null)

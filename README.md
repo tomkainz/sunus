@@ -20,11 +20,11 @@ Ein kleiner Helfer (`shell/SubmixRecorder`) läuft mit Shell-Rechten und liest d
 
 Einmalige Einrichtung:
 
-1. In den Entwickleroptionen „Kabelloses Debugging“ einschalten.
-2. „Gerät mit Kopplungscode koppeln“ antippen.
-3. Code und Port in der App eintragen.
+1. In der App auf „Kopplung starten“ tippen. Die Entwickleroptionen öffnen sich.
+2. „Kabelloses Debugging“ einschalten, antippen und „Gerät mit Kopplungscode koppeln“ wählen.
+3. Den Dialog offen lassen, die Benachrichtigungsleiste herunterziehen und bei „Sonos Live koppeln“ den 6-stelligen Code eingeben.
 
-Nach einem Neustart des Handys muss „Kabelloses Debugging“ wieder eingeschaltet werden. Diese Betriebsart setzt Android 12 voraus.
+Den Port sucht die App selbst per mDNS. Der Code wird über die Benachrichtigung abgefragt, weil Android den Kopplungsdialog schließt, sobald man die Einstellungen verlässt. Nach einem Neustart des Handys muss „Kabelloses Debugging“ wieder eingeschaltet werden, die Kopplung selbst bleibt erhalten. Diese Betriebsart setzt Android 12 voraus.
 
 ### Standard
 

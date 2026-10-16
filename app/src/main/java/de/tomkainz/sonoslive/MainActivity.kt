@@ -41,8 +41,7 @@ class MainActivity : ComponentActivity() {
                     onSelect = { AppState.select(it) },
                     onAddManual = { AppState.addManual(it) },
                     onSetVolume = { AppState.setVolume(it) },
-                    onPair = { port, code -> AppState.pairAllApps(this, port, code) },
-                    onOpenDevOptions = { openDeveloperOptions() }
+                    onStartPairing = { port -> startPairing(port) }
                 )
             }
         }
@@ -117,13 +116,32 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Startet die Kopplung: Dienst mit Code-Benachrichtigung und Port-Suche,
+     * dann die Entwickleroptionen. Ohne Benachrichtigungen geht es nicht, weil
+     * der Code dort eingegeben wird.
+     */
+    private fun startPairing(manualPort: Int?) {
+        if (Build.VERSION.SDK_INT >= 33 && !granted(Manifest.permission.POST_NOTIFICATIONS)) {
+            AppState.adbMessage.value = "Bitte Benachrichtigungen erlauben, dort wird der Code eingegeben."
+            permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
+            return
+        }
+        PairingService.start(this, manualPort)
+        openDeveloperOptions()
+    }
+
     private fun openDeveloperOptions() {
+        // Der Schluessel laesst die Einstellungen direkt zu "Kabelloses
+        // Debugging" scrollen und den Eintrag hervorheben.
         val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+            .putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { startActivity(intent) }
             .onFailure {
+                AppState.adbMessage.value = "Entwickleroptionen sind noch nicht freigeschaltet."
                 runCatching {
-                    startActivity(Intent(android.provider.Settings.ACTION_SETTINGS))
+                    startActivity(Intent(android.provider.Settings.ACTION_DEVICE_INFO_SETTINGS))
                 }
             }
     }

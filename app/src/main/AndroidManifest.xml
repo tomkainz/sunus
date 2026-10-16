@@ -46,6 +46,11 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection|connectedDevice" />
 
+        <service
+            android:name=".PairingService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
     </application>
 
 </manifest>
