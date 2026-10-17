@@ -1,8 +1,12 @@
-# Sonos Bridge 2.0
+# Sunus
 
-Android-App, die den Ton des Handys live auf einem Sonos-Lautsprecher abspielt. Das Handy übernimmt dabei die Rolle eines Bluetooth-Zuspielers, nur über WLAN und ohne zusätzlichen Rechner. Auf dem Handy heißt die App „Sunus“.
+**Sonos Bridge** für Android, Nachfolger von [tomkainz/sonos-bridge](https://github.com/tomkainz/sonos-bridge)
 
-Die erste Version, [sonos-bridge](https://github.com/tomkainz/sonos-bridge), brauchte einen Linux-Rechner als Bluetooth-Empfänger. Diese Rolle übernimmt jetzt das Handy selbst.
+Android-App, die den Ton des Handys live auf einem Sonos-Lautsprecher abspielt. Das Handy übernimmt dabei die Rolle eines Bluetooth-Zuspielers, nur über WLAN und ohne zusätzlichen Rechner.
+
+Die erste Sonos Bridge brauchte einen Linux-Rechner als Bluetooth-Empfänger. Diese Rolle übernimmt jetzt das Handy selbst.
+
+Aktuell: Version 1.0, Beta.
 
 ## Funktionsweise
 
