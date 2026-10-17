@@ -115,7 +115,7 @@ object Diagnose {
         val speaker = AppState.selected.value?.let { "${it.room}, ${it.ip}, ${it.model}" } ?: "none"
         val en = english(context)
         return buildString {
-            appendLine("Sunos – error report")
+            appendLine("Sunus – error report")
             appendLine("Code:        " + codes.joinToString(", ") { "${it.label} ${en.getString(it.text)}" })
             appendLine("Time:        ${stamp.format(Date())}")
             appendLine("App:         $version")
@@ -135,7 +135,7 @@ object Diagnose {
         val report = AppState.report.value ?: return
         val send = Intent(Intent.ACTION_SEND)
             .setType("text/plain")
-            .putExtra(Intent.EXTRA_SUBJECT, "Sunos error report")
+            .putExtra(Intent.EXTRA_SUBJECT, "Sunus error report")
             .putExtra(Intent.EXTRA_TEXT, report)
         context.startActivity(
             Intent.createChooser(send, context.getString(R.string.report_share_title))
@@ -146,7 +146,7 @@ object Diagnose {
     /** Legt den letzten Bericht als Textdatei unter "Downloads" ab. */
     fun saveToDownloads(context: Context) {
         val report = AppState.report.value ?: return
-        val name = "Sunos-report-" +
+        val name = "Sunus-report-" +
             SimpleDateFormat("yyyyMMdd-HHmmss", Locale.GERMANY).format(Date()) + ".txt"
         runCatching {
             val values = ContentValues().apply {

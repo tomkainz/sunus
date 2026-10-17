@@ -192,7 +192,7 @@ object AppState {
 
     fun log(line: String) {
         val stamped = "${timeFormat.format(Date())}  $line"
-        android.util.Log.i("Sunos", line)
+        android.util.Log.i("Sunus", line)
         requestLog.value = (listOf(stamped) + requestLog.value).take(8)
     }
 }

@@ -49,7 +49,7 @@
 
     <!-- Kopplung -->
     <string name="pair_title">Alle Apps einrichten</string>
-    <string name="pair_steps">1. Auf „Kopplung starten“ tippen. „Kabelloses Debugging“ öffnet sich.\n2. Einschalten und „Gerät mit Kopplungscode koppeln“ antippen.\n3. Den Dialog offen lassen, die Benachrichtigungsleiste herunterziehen und bei „Sunos koppeln“ den 6-stelligen Code eingeben.</string>
+    <string name="pair_steps">1. Auf „Kopplung starten“ tippen. „Kabelloses Debugging“ öffnet sich.\n2. Einschalten und „Gerät mit Kopplungscode koppeln“ antippen.\n3. Den Dialog offen lassen, die Benachrichtigungsleiste herunterziehen und bei „Sunus koppeln“ den 6-stelligen Code eingeben.</string>
     <string name="pair_hint">Den Port findet die App selbst. Sind die Entwickleroptionen noch versteckt: Einstellungen &gt; Über das Telefon &gt; 7× auf „Build-Nummer“ tippen.</string>
     <string name="pair_port_label">Port aus dem Kopplungsdialog</string>
     <string name="pair_port_auto">Port automatisch</string>
@@ -58,7 +58,7 @@
     <string name="pair_need_notifications">Bitte Benachrichtigungen erlauben, dort wird der Code eingegeben.</string>
     <string name="pair_unlock_dev">Erst die Entwickleroptionen freischalten: 7× auf „Build-Nummer“ tippen, dann zurück und erneut „Kopplung starten“.</string>
     <string name="pair_dev_locked">Entwickleroptionen sind noch nicht freigeschaltet.</string>
-    <string name="pair_notif_title">Sunos koppeln</string>
+    <string name="pair_notif_title">Sunus koppeln</string>
     <string name="pair_notif_open">Kopplungsdialog öffnen, dann hier den Code eingeben</string>
     <string name="pair_waiting">Warte auf den Kopplungsdialog…</string>
     <string name="pair_timeout">Zeit abgelaufen. Bitte erneut starten.</string>

@@ -1,4 +1,4 @@
-# Sunos
+# Sunus
 
 **Sonos Bridge** for Android, successor to [tomkainz/sonos-bridge](https://github.com/tomkainz/sonos-bridge)
 
@@ -20,7 +20,7 @@ The app finds speakers via SSDP. If the router filters multicast, it scans the l
 
 ## Capture modes
 
-The app is in English and German. It follows the phone's language; on Android 13 and newer it can be set per app under Settings > Apps > Sunos > Language.
+The app is in English and German. It follows the phone's language; on Android 13 and newer it can be set per app under Settings > Apps > Sunus > Language.
 
 ### All apps
 
@@ -32,7 +32,7 @@ One-time setup:
 
 1. In the app, tap **Start pairing**. The **Wireless debugging** page opens.
 2. Turn it on and tap **Pair device with pairing code**.
-3. Leave the dialog open, pull down the notification shade and enter the 6-digit code in the **Pair Sunos** notification.
+3. Leave the dialog open, pull down the notification shade and enter the 6-digit code in the **Pair Sunus** notification.
 
 The app finds the port itself via mDNS. The code is entered through the notification because Android closes the pairing dialog as soon as you leave Settings. There is no public intent for the Wireless debugging page; the app takes the same route as a long press on the Quick Settings tile. Where that isn't available, Developer options open instead.
 
