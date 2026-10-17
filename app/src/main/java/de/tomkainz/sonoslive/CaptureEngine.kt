@@ -98,7 +98,7 @@ class CaptureEngine(
                 Diagnose.fail(context, Diagnose.Code.S1, extra = "recordingState=${recorder.recordingState}")
                 return
             }
-            AppState.status.value = "Live (Standard)"
+            AppState.status.value = context.getString(R.string.status_live_standard)
 
             val buffer = ByteArray(1024 * LiveStreamServer.CHANNELS * 2)
             while (running) {
@@ -114,7 +114,7 @@ class CaptureEngine(
 
     private fun runAllApps() {
         try {
-            AppState.status.value = "Verbinde ADB..."
+            AppState.status.value = context.getString(R.string.status_connecting_adb)
             val connected = try {
                 AdbManager.connect(context)
             } catch (e: Exception) {
@@ -157,7 +157,7 @@ class CaptureEngine(
                     return
                 }
             }
-            AppState.status.value = "Live (alle Apps)"
+            AppState.status.value = context.getString(R.string.status_live_all_apps)
 
             val buffer = ByteArray(1024 * LiveStreamServer.CHANNELS * 2)
             while (running) {

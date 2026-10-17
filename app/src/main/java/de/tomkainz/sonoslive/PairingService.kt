@@ -53,7 +53,7 @@ class PairingService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_CANCEL -> {
-                finish("Kopplung abgebrochen.")
+                finish(getString(R.string.pair_cancelled))
                 return START_NOT_STICKY
             }
         }
@@ -63,14 +63,14 @@ class PairingService : Service() {
         intent?.getIntExtra(EXTRA_PORT, -1)?.takeIf { it > 0 }?.let { port = it }
         startForeground(
             NOTIFICATION_ID,
-            notification("Kopplungsdialog öffnen, dann hier den Code eingeben", withInput = true),
+            notification(getString(R.string.pair_notif_open), withInput = true),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
         )
         AppState.adbBusy.value = true
-        AppState.adbMessage.value = "Warte auf den Kopplungsdialog..."
+        AppState.adbMessage.value = getString(R.string.pair_waiting)
         startDiscovery()
         handler.removeCallbacksAndMessages(TIMEOUT_TOKEN)
-        handler.postAtTime({ finish("Zeit abgelaufen. Bitte erneut starten.") },
+        handler.postAtTime({ finish(getString(R.string.pair_timeout)) },
             TIMEOUT_TOKEN, android.os.SystemClock.uptimeMillis() + TIMEOUT_MS)
         return START_NOT_STICKY
     }
@@ -90,8 +90,8 @@ class PairingService : Service() {
                 host = address?.hostAddress
                 port = p
                 if (!busy) {
-                    update("Kopplungsdialog gefunden. Jetzt den 6-stelligen Code eingeben.", withInput = true)
-                    AppState.adbMessage.value = "Kopplungsdialog gefunden. Code in der Benachrichtigung eingeben."
+                    update(getString(R.string.pair_found_notif), withInput = true)
+                    AppState.adbMessage.value = getString(R.string.pair_found)
                 }
             }
         }.also { it.start() }
@@ -101,14 +101,14 @@ class PairingService : Service() {
         val code = RemoteInput.getResultsFromIntent(intent)
             ?.getCharSequence(KEY_CODE)?.toString()?.filter { it.isDigit() } ?: ""
         if (code.length != 6) {
-            update("Der Code hat 6 Ziffern. Bitte erneut eingeben.", withInput = true)
-            AppState.adbMessage.value = "Der Code hat 6 Ziffern."
+            update(getString(R.string.pair_digits_notif), withInput = true)
+            AppState.adbMessage.value = getString(R.string.pair_digits)
             return
         }
         if (busy) return
         busy = true
-        update("Kopple...", withInput = false)
-        AppState.adbMessage.value = "Kopple..."
+        update(getString(R.string.pair_pairing), withInput = false)
+        AppState.adbMessage.value = getString(R.string.pair_pairing)
 
         AppState.scope.launch {
             // Kam der Code schneller als die Suche, kurz auf den Port warten.
@@ -119,8 +119,8 @@ class PairingService : Service() {
             }
             if (port <= 0) {
                 busy = false
-                update("Kein Kopplungsdialog gefunden. Ist er noch offen?", withInput = true)
-                AppState.adbMessage.value = "Kein Kopplungsdialog gefunden."
+                update(getString(R.string.pair_no_dialog_notif), withInput = true)
+                AppState.adbMessage.value = getString(R.string.pair_no_dialog)
                 return@launch
             }
 
@@ -131,20 +131,20 @@ class PairingService : Service() {
             }
             if (!paired) {
                 busy = false
-                update("Kopplung fehlgeschlagen. Code prüfen; der Dialog muss offen sein.", withInput = true)
-                AppState.adbMessage.value = "Kopplung fehlgeschlagen. Code prüfen."
+                update(getString(R.string.pair_failed_notif), withInput = true)
+                AppState.adbMessage.value = getString(R.string.pair_failed)
                 return@launch
             }
 
-            update("Gekoppelt. Verbinde...", withInput = false)
+            update(getString(R.string.pair_connecting), withInput = false)
             val connected = runCatching { AdbManager.connect(this@PairingService) }.getOrDefault(false)
             AppState.setAdbPaired(true)
             AppState.requestPairing.value = false
             if (connected) {
                 AdbManager.grantSelf(this@PairingService)
-                finish("Gekoppelt. Alle Apps ist eingerichtet.")
+                finish(getString(R.string.pair_done))
             } else {
-                finish("Gekoppelt. Verbindung folgt beim Start.")
+                finish(getString(R.string.pair_done_later))
             }
         }
     }
@@ -177,7 +177,7 @@ class PairingService : Service() {
         )
         val builder = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_logo)
-            .setContentTitle("Sunus koppeln")
+            .setContentTitle(getString(R.string.pair_notif_title))
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
             .setContentIntent(open)
@@ -185,7 +185,7 @@ class PairingService : Service() {
             .setOnlyAlertOnce(true)
 
         if (withInput) {
-            val input = RemoteInput.Builder(KEY_CODE).setLabel("6-stelliger Code").build()
+            val input = RemoteInput.Builder(KEY_CODE).setLabel(getString(R.string.pair_code_label)).build()
             // FLAG_MUTABLE ist fuer RemoteInput noetig, damit das System den
             // eingegebenen Text einfuegen kann. Die Absicht ist explizit.
             val reply = PendingIntent.getService(
@@ -195,7 +195,7 @@ class PairingService : Service() {
             )
             val icon = Icon.createWithResource(this, R.drawable.ic_stat_logo)
             builder.addAction(
-                Notification.Action.Builder(icon, "Code eingeben", reply)
+                Notification.Action.Builder(icon, getString(R.string.pair_enter_code), reply)
                     .addRemoteInput(input)
                     .build()
             )
@@ -207,7 +207,7 @@ class PairingService : Service() {
                 Intent(this, PairingService::class.java).setAction(ACTION_CANCEL),
                 PendingIntent.FLAG_IMMUTABLE
             )
-            builder.addAction(Notification.Action.Builder(null, "Abbrechen", cancel).build())
+            builder.addAction(Notification.Action.Builder(null, getString(R.string.cancel), cancel).build())
         }
         return builder.build()
     }

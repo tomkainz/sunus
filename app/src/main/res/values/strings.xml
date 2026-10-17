@@ -1,6 +1,104 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Sunus</string>
-    <string name="channel_live">Stream aktiv</string>
-    <string name="channel_pairing">Einrichtung</string>
+    <string name="app_name" translatable="false">Sunos</string>
+    <string name="channel_live">Streaming</string>
+    <string name="channel_live_desc">Shows that audio is currently going to the speaker</string>
+    <string name="channel_pairing">Setup</string>
+
+    <!-- Hauptansicht -->
+    <string name="mode_all_apps">All apps</string>
+    <string name="mode_standard">Standard</string>
+    <string name="mode_all_apps_hint">Every app, even blocked ones · phone goes silent</string>
+    <string name="mode_standard_hint">No setup · some apps block capture</string>
+    <string name="status_live">Live · %1$s</string>
+    <string name="status_live_silent">Live · %1$s · silent</string>
+    <string name="status_searching">Searching for speakers…</string>
+    <string name="status_no_speaker">No speaker selected</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_scanning">Scanning network…</string>
+    <string name="status_connecting_adb">Connecting ADB…</string>
+    <string name="status_live_standard">Live (Standard)</string>
+    <string name="status_live_all_apps">Live (all apps)</string>
+    <string name="empty_searching">Searching Wi-Fi…</string>
+    <string name="empty_none">No Sonos found</string>
+    <string name="empty_hint">Tap to search · IP under ⋯</string>
+
+    <!-- Meldungen -->
+    <string name="report_share">Share report</string>
+    <string name="report_save">Save</string>
+    <string name="msg_no_consent">Without consent, Standard mode can\'t record.</string>
+    <string name="msg_pick_speaker">Pick a speaker first.</string>
+    <string name="msg_need_record">Allow the microphone/recording permission for Standard mode.</string>
+    <string name="msg_need_network">Without the local network permission the app can\'t find any speaker.</string>
+    <string name="msg_no_speaker">No speaker selected.</string>
+    <string name="msg_no_sonos_at">No Sonos answers at %1$s.</string>
+    <string name="msg_volume_error">Volume: %1$s</string>
+
+    <!-- Mehr -->
+    <string name="more_ip">Speaker by IP</string>
+    <string name="ok">OK</string>
+    <string name="more_mute">Mute phone</string>
+    <string name="more_mute_hint">Standard mode only (All apps is always silent)</string>
+    <string name="hint_upnp">In the Sonos app, UPnP must be on under Account &gt; Privacy &amp; Security &gt; Connection Security (default).</string>
+    <string name="hint_lossless">Lossless (PCM). Audio reaches the Sonos a little later: ideal for music, not lip-synced for video.</string>
+    <string name="hint_all_apps">All apps: turn on \"Wireless debugging\" in Developer options once and pair. No root needed. After that the app turns it back on by itself, even after a reboot. Developer options must stay on; if Android asks about the Wi-Fi network, tick \"Always allow on this network\".</string>
+    <string name="last_report">Last error report</string>
+    <string name="share">Share</string>
+    <string name="save_downloads">Save to Downloads</string>
+    <string name="close">Close</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- Kopplung -->
+    <string name="pair_title">Set up All apps</string>
+    <string name="pair_steps">1. Tap \"Start pairing\". \"Wireless debugging\" opens.\n2. Turn it on and tap \"Pair device with pairing code\".\n3. Leave the dialog open, pull down the notification shade and enter the 6-digit code in \"Pair Sunos\".</string>
+    <string name="pair_hint">The app finds the port itself. If Developer options are still hidden: Settings &gt; About phone &gt; tap \"Build number\" 7 times.</string>
+    <string name="pair_port_label">Port from the pairing dialog</string>
+    <string name="pair_port_auto">Port automatic</string>
+    <string name="pair_port_manual">Enter port manually</string>
+    <string name="pair_start">Start pairing</string>
+    <string name="pair_need_notifications">Please allow notifications, that\'s where the code is entered.</string>
+    <string name="pair_unlock_dev">Unlock Developer options first: tap \"Build number\" 7 times, then come back and tap \"Start pairing\" again.</string>
+    <string name="pair_dev_locked">Developer options aren\'t unlocked yet.</string>
+    <string name="pair_notif_title">Pair Sunos</string>
+    <string name="pair_notif_open">Open the pairing dialog, then enter the code here</string>
+    <string name="pair_waiting">Waiting for the pairing dialog…</string>
+    <string name="pair_timeout">Timed out. Please start again.</string>
+    <string name="pair_cancelled">Pairing cancelled.</string>
+    <string name="pair_found_notif">Pairing dialog found. Now enter the 6-digit code.</string>
+    <string name="pair_found">Pairing dialog found. Enter the code in the notification.</string>
+    <string name="pair_digits_notif">The code has 6 digits. Please enter it again.</string>
+    <string name="pair_digits">The code has 6 digits.</string>
+    <string name="pair_pairing">Pairing…</string>
+    <string name="pair_no_dialog_notif">No pairing dialog found. Is it still open?</string>
+    <string name="pair_no_dialog">No pairing dialog found.</string>
+    <string name="pair_failed_notif">Pairing failed. Check the code; the dialog must be open.</string>
+    <string name="pair_failed">Pairing failed. Check the code.</string>
+    <string name="pair_connecting">Paired. Connecting…</string>
+    <string name="pair_done">Paired. All apps is set up.</string>
+    <string name="pair_done_later">Paired. Connection follows on start.</string>
+    <string name="pair_code_label">6-digit code</string>
+    <string name="pair_enter_code">Enter code</string>
+    <string name="adb_not_found">Wireless debugging not found. Is it on and is Wi-Fi connected?</string>
+
+    <!-- Stream-Benachrichtigung -->
+    <string name="notif_live_text">Phone audio is playing on the Sonos</string>
+    <string name="notif_stop">Stop</string>
+
+    <!-- Fehlercodes und Bericht -->
+    <string name="error_format">%1$s (error %2$s)</string>
+    <string name="code_a1">ADB connection failed. Is \"Wireless debugging\" on?</string>
+    <string name="code_a2">The capture helper did not start.</string>
+    <string name="code_a3">The capture helper reports an error.</string>
+    <string name="code_a4">Unexpected reply from the capture helper.</string>
+    <string name="code_a5">All apps mode stopped.</string>
+    <string name="code_s1">Capture does not start.</string>
+    <string name="code_s2">Capture stopped.</string>
+    <string name="code_s3">No consent to capture.</string>
+    <string name="code_d1">No Wi-Fi address. Is the phone on Wi-Fi?</string>
+    <string name="code_d2">Stream server does not start.</string>
+    <string name="code_d3">The Sonos does not accept the stream.</string>
+    <string name="code_x1">The app crashed.</string>
+    <string name="report_share_title">Share error report</string>
+    <string name="report_saved">Saved to Downloads/%1$s</string>
+    <string name="report_save_failed">Saving failed: %1$s</string>
 </resources>

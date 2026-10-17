@@ -62,7 +62,7 @@ class LiveService : Service() {
 
         val speaker = AppState.selected.value
         if (speaker == null) {
-            AppState.message.value = "Kein Lautsprecher gewählt."
+            AppState.message.value = getString(R.string.msg_no_speaker)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -218,7 +218,7 @@ class LiveService : Service() {
 
     private fun stopInternals() {
         AppState.running.value = false
-        AppState.status.value = "Bereit"
+        AppState.status.value = getString(R.string.status_ready)
         handler.removeCallbacksAndMessages(null)
         runCatching { sonos?.stop() }
         sonos = null
@@ -272,11 +272,11 @@ class LiveService : Service() {
             PendingIntent.FLAG_IMMUTABLE
         )
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("Sunus")
-            .setContentText("Handy-Ton läuft auf dem Sonos")
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(getString(R.string.notif_live_text))
             .setSmallIcon(R.drawable.ic_stat_logo)
             .setContentIntent(open)
-            .addAction(Notification.Action.Builder(null, "Stopp", stop).build())
+            .addAction(Notification.Action.Builder(null, getString(R.string.notif_stop), stop).build())
             .setOngoing(true)
             .build()
     }
@@ -287,7 +287,7 @@ class LiveService : Service() {
             CHANNEL_ID, getString(R.string.channel_live), NotificationManager.IMPORTANCE_LOW
         ).apply {
             setShowBadge(false)
-            description = "Zeigt an, dass der Ton gerade zum Lautsprecher läuft"
+            description = getString(R.string.channel_live_desc)
         }
         manager.createNotificationChannel(channel)
     }

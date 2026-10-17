@@ -47,7 +47,7 @@ object AppState {
     }
 
     val running = MutableStateFlow(false)
-    val status = MutableStateFlow("Bereit")
+    val status = MutableStateFlow("")
     val message = MutableStateFlow<String?>(null)
 
     /** Letzter Fehlerbericht (siehe [Diagnose]), zum Teilen oder Speichern. */
@@ -60,8 +60,15 @@ object AppState {
     val volume = MutableStateFlow<Int?>(null)
     val requestLog = MutableStateFlow<List<String>>(emptyList())
 
+    /** Fuer Meldungen aus Stellen ohne eigenen Context. */
+    private lateinit var app: Context
+
+    fun text(id: Int, vararg args: Any): String = app.getString(id, *args)
+
     fun init(context: Context) {
+        app = context.applicationContext
         prefs = context.getSharedPreferences("sonoslive", Context.MODE_PRIVATE)
+        status.value = text(R.string.status_ready)
         mode.value = runCatching { CaptureMode.valueOf(prefs.getString("mode", null)!!) }
             .getOrDefault(CaptureMode.ALL_APPS)
         muteLocal.value = prefs.getBoolean("muteLocal", true)
@@ -123,9 +130,9 @@ object AppState {
                 if (found.isEmpty()) {
                     val ip = Net.localIp(context)
                     if (ip != null) {
-                        status.value = "Durchsuche Netzwerk..."
+                        status.value = text(R.string.status_scanning)
                         found = Ssdp.scanSubnet(ip) { sp -> addFound(sp) }
-                        status.value = "Bereit"
+                        status.value = text(R.string.status_ready)
                     }
                 }
 
@@ -157,7 +164,7 @@ object AppState {
         scope.launch {
             val speaker = Ssdp.probe(clean)
             if (speaker == null) {
-                message.value = "Unter $clean antwortet kein Sonos."
+                message.value = text(R.string.msg_no_sonos_at, clean)
             } else {
                 speakers.value = (speakers.value + speaker).distinctBy { it.udn }
                 select(speaker)
@@ -177,7 +184,7 @@ object AppState {
         volume.value = v.coerceIn(0, 100)
         scope.launch {
             runCatching { Sonos(speaker).setVolume(v) }
-                .onFailure { message.value = "Lautstärke: ${it.message}" }
+                .onFailure { message.value = text(R.string.msg_volume_error, it.message ?: "") }
         }
     }
 
@@ -185,7 +192,7 @@ object AppState {
 
     fun log(line: String) {
         val stamped = "${timeFormat.format(Date())}  $line"
-        android.util.Log.i("Sunus", line)
+        android.util.Log.i("Sunos", line)
         requestLog.value = (listOf(stamped) + requestLog.value).take(8)
     }
 }

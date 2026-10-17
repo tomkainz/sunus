@@ -45,7 +45,7 @@ public final class SubmixRecorder {
         AudioRecord recorder = null;
         try {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                throw new IllegalStateException("braucht Android 12 oder neuer");
+                throw new IllegalStateException("needs Android 12 or newer");
             }
             Looper.prepareMainLooper();
             ShellRuntime.apply();
@@ -53,7 +53,7 @@ public final class SubmixRecorder {
             recorder = create();
             recorder.startRecording();
             if (recorder.getRecordingState() != AudioRecord.RECORDSTATE_RECORDING) {
-                throw new IllegalStateException("Aufnahme startet nicht");
+                throw new IllegalStateException("recording does not start");
             }
 
             out.write(("PCM " + SAMPLE_RATE + " " + CHANNELS + "\n").getBytes(StandardCharsets.US_ASCII));

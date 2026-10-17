@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -112,7 +113,7 @@ fun SonosLiveApp(
                 Image(painterResource(R.drawable.logo_mark), contentDescription = null, modifier = Modifier.width(48.dp))
             }
             Text(
-                "Sunus",
+                stringResource(R.string.app_name),
                 style = MaterialTheme.typography.headlineMedium,
                 color = c.onBackground,
                 textAlign = TextAlign.Center,
@@ -131,8 +132,7 @@ fun SonosLiveApp(
             Spacer(Modifier.height(32.dp))
             ModeToggle(mode, enabled = !running)
             Text(
-                if (mode == CaptureMode.ALL_APPS) "Jede App, auch gesperrte · Handy wird stumm"
-                else "Ohne Einrichtung · manche Apps sperren die Aufnahme",
+                stringResource(if (mode == CaptureMode.ALL_APPS) R.string.mode_all_apps_hint else R.string.mode_standard_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = c.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -174,15 +174,18 @@ fun SonosLiveApp(
     }
 }
 
+@Composable
 private fun statusText(
     running: Boolean, status: String, audioFlowing: Boolean, selected: Speaker?, searching: Boolean
 ): String = when {
-    running && status.startsWith("Live") ->
-        "Live · ${selected?.room ?: ""}" + if (audioFlowing) "" else " · still"
+    // Die Live-Status beginnen in jeder Sprache mit "Live".
+    running && status.startsWith("Live") -> stringResource(
+        if (audioFlowing) R.string.status_live else R.string.status_live_silent, selected?.room ?: ""
+    )
     running -> status
-    searching -> "Suche Lautsprecher..."
-    selected == null -> "Kein Lautsprecher gewählt"
-    else -> "Bereit"
+    searching -> stringResource(R.string.status_searching)
+    selected == null -> stringResource(R.string.status_no_speaker)
+    else -> stringResource(R.string.status_ready)
 }
 
 // ---- Lautsprecher -------------------------------------------------------
@@ -214,10 +217,10 @@ private fun EmptySpeaker(searching: Boolean, onDiscover: () -> Unit) {
     val c = MaterialTheme.colorScheme
     Surface(Modifier.fillMaxWidth().clickable(onClick = onDiscover), shape = ROW, color = c.surfaceContainer) {
         Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(if (searching) "Suche im WLAN..." else "Kein Sonos gefunden",
+            Text(stringResource(if (searching) R.string.empty_searching else R.string.empty_none),
                 style = MaterialTheme.typography.titleMedium, color = c.onSurface)
             if (!searching) {
-                Text("Tippen zum Suchen · IP unter ⋯", style = MaterialTheme.typography.labelSmall,
+                Text(stringResource(R.string.empty_hint), style = MaterialTheme.typography.labelSmall,
                     color = c.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
             }
         }
@@ -231,10 +234,10 @@ private fun ModeToggle(mode: CaptureMode, enabled: Boolean) {
     val c = MaterialTheme.colorScheme
     Surface(Modifier.fillMaxWidth(), shape = CircleShape, color = c.surfaceContainer) {
         Row(Modifier.padding(4.dp)) {
-            Pill("Alle Apps", mode == CaptureMode.ALL_APPS, enabled, Modifier.weight(1f)) {
+            Pill(stringResource(R.string.mode_all_apps), mode == CaptureMode.ALL_APPS, enabled, Modifier.weight(1f)) {
                 AppState.setMode(CaptureMode.ALL_APPS)
             }
-            Pill("Standard", mode == CaptureMode.STANDARD, enabled, Modifier.weight(1f)) {
+            Pill(stringResource(R.string.mode_standard), mode == CaptureMode.STANDARD, enabled, Modifier.weight(1f)) {
                 AppState.setMode(CaptureMode.STANDARD)
             }
         }
@@ -329,7 +332,7 @@ private fun IconSpot(onClick: () -> Unit, content: @Composable () -> Unit) {
 private fun Snackbar(text: String, modifier: Modifier) {
     val c = MaterialTheme.colorScheme
     val context = LocalContext.current
-    val withReport = text.contains("(Fehler SL-")
+    val withReport = Regex("SL-[A-Z][0-9]").containsMatchIn(text)
     Surface(
         modifier.padding(horizontal = 24.dp).clickable { AppState.message.value = null },
         shape = RoundedCornerShape(14.dp), color = c.surfaceContainerHigh
@@ -338,8 +341,8 @@ private fun Snackbar(text: String, modifier: Modifier) {
             Text(text, style = MaterialTheme.typography.bodyMedium, color = c.onSurface, textAlign = TextAlign.Center)
             if (withReport) {
                 Row {
-                    TextButton(onClick = { Diagnose.share(context) }) { Text("Bericht teilen") }
-                    TextButton(onClick = { Diagnose.saveToDownloads(context) }) { Text("Speichern") }
+                    TextButton(onClick = { Diagnose.share(context) }) { Text(stringResource(R.string.report_share)) }
+                    TextButton(onClick = { Diagnose.saveToDownloads(context) }) { Text(stringResource(R.string.report_save)) }
                 }
             }
         }
@@ -374,7 +377,7 @@ private fun MoreSheet(mode: CaptureMode, running: Boolean, onAddManual: (String)
                     Box(Modifier.size(width = 36.dp, height = 4.dp).background(c.outline, CircleShape))
                 }
 
-                Text("Lautsprecher per IP", style = MaterialTheme.typography.labelSmall, color = c.onSurfaceVariant)
+                Text(stringResource(R.string.more_ip), style = MaterialTheme.typography.labelSmall, color = c.onSurfaceVariant)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = ip, onValueChange = { ip = it }, placeholder = { Text("192.168.x.x") },
@@ -382,13 +385,13 @@ private fun MoreSheet(mode: CaptureMode, running: Boolean, onAddManual: (String)
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f)
                     )
-                    TextButton(onClick = { onAddManual(ip); ip = ""; onClose() }) { Text("OK") }
+                    TextButton(onClick = { onAddManual(ip); ip = ""; onClose() }) { Text(stringResource(R.string.ok)) }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Handy stumm", style = MaterialTheme.typography.bodyMedium, color = c.onSurface)
-                        Text("Nur Standard-Modus (Alle Apps ist immer stumm)",
+                        Text(stringResource(R.string.more_mute), style = MaterialTheme.typography.bodyMedium, color = c.onSurface)
+                        Text(stringResource(R.string.more_mute_hint),
                             style = MaterialTheme.typography.labelSmall, color = c.onSurfaceVariant)
                     }
                     Switch(
@@ -400,33 +403,26 @@ private fun MoreSheet(mode: CaptureMode, running: Boolean, onAddManual: (String)
 
                 HorizontalDivider(color = c.outlineVariant)
 
-                Hint("In der Sonos-App unter Konto > Datenschutz und Sicherheit > Verbindungssicherheit " +
-                    "muss UPnP an sein (Standard).")
-                Hint("Verlustfreie Übertragung (PCM). Der Ton kommt etwas später am Sonos an: " +
-                    "für Musik ideal, für Videos nicht lippensynchron.")
-                if (mode == CaptureMode.ALL_APPS) {
-                    Hint("Alle Apps: einmal \"Kabelloses Debugging\" in den Entwickleroptionen einschalten " +
-                        "und koppeln. Kein Root nötig. Danach schaltet die App es selbst wieder ein, " +
-                        "auch nach einem Neustart. Die Entwickleroptionen müssen an bleiben; fragt Android " +
-                        "nach dem WLAN, \"In diesem Netzwerk immer zulassen\" ankreuzen.")
-                }
+                Hint(stringResource(R.string.hint_upnp))
+                Hint(stringResource(R.string.hint_lossless))
+                if (mode == CaptureMode.ALL_APPS) Hint(stringResource(R.string.hint_all_apps))
 
                 if (report != null) {
                     HorizontalDivider(color = c.outlineVariant)
-                    Text("Letzter Fehlerbericht", style = MaterialTheme.typography.labelSmall, color = c.onSurfaceVariant)
+                    Text(stringResource(R.string.last_report), style = MaterialTheme.typography.labelSmall, color = c.onSurfaceVariant)
                     Text(
                         report!!.lineSequence().drop(1).take(2).joinToString("\n") { it.substringAfter(":").trim() },
                         style = MaterialTheme.typography.bodyMedium, color = c.onSurface
                     )
                     Row {
-                        TextButton(onClick = { Diagnose.share(context) }) { Text("Teilen") }
+                        TextButton(onClick = { Diagnose.share(context) }) { Text(stringResource(R.string.share)) }
                         TextButton(onClick = { Diagnose.saveToDownloads(context); onClose() }) {
-                            Text("In Downloads speichern")
+                            Text(stringResource(R.string.save_downloads))
                         }
                     }
                 }
 
-                TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End)) { Text("Schließen") }
+                TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.close)) }
             }
         }
     }
@@ -456,20 +452,16 @@ private fun PairingDialog(onStartPairing: (Int?) -> Unit) {
                 Modifier.verticalScroll(rememberScrollState()).padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text("Alle Apps einrichten", style = MaterialTheme.typography.titleMedium, color = c.onSurface)
-                Text("1. Auf „Kopplung starten“ tippen. „Kabelloses Debugging“ öffnet sich.\n" +
-                    "2. Einschalten und „Gerät mit Kopplungscode koppeln“ antippen.\n" +
-                    "3. Den Dialog offen lassen, die Benachrichtigungsleiste herunterziehen und bei „Sunus koppeln“ " +
-                    "den 6-stelligen Code eingeben.",
+                Text(stringResource(R.string.pair_title), style = MaterialTheme.typography.titleMedium, color = c.onSurface)
+                Text(stringResource(R.string.pair_steps),
                     style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
-                Text("Den Port findet die App selbst. Sind die Entwickleroptionen noch versteckt: " +
-                    "Einstellungen > Über das Telefon > 7× auf „Build-Nummer“ tippen.",
+                Text(stringResource(R.string.pair_hint),
                     style = MaterialTheme.typography.labelSmall, color = c.onSurfaceVariant)
 
                 if (manual) {
                     OutlinedTextField(
                         value = port, onValueChange = { port = it.filter { ch -> ch.isDigit() }.take(5) },
-                        label = { Text("Port aus dem Kopplungsdialog") }, singleLine = true,
+                        label = { Text(stringResource(R.string.pair_port_label)) }, singleLine = true,
                         shape = RoundedCornerShape(14.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
@@ -480,12 +472,12 @@ private fun PairingDialog(onStartPairing: (Int?) -> Unit) {
 
                 // Eigene Zeile: zu dritt in einer Zeile brach "Kopplung starten" mehrfach um.
                 TextButton(onClick = { manual = !manual }) {
-                    Text(if (manual) "Port automatisch" else "Port selbst eintragen",
+                    Text(stringResource(if (manual) R.string.pair_port_auto else R.string.pair_port_manual),
                         style = MaterialTheme.typography.labelSmall)
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Spacer(Modifier.weight(1f))
-                    TextButton(onClick = { AppState.requestPairing.value = false }) { Text("Schließen") }
+                    TextButton(onClick = { AppState.requestPairing.value = false }) { Text(stringResource(R.string.close)) }
                     Spacer(Modifier.width(4.dp))
                     Button(
                         onClick = { onStartPairing(if (manual) port.toIntOrNull() else null) },
@@ -493,7 +485,7 @@ private fun PairingDialog(onStartPairing: (Int?) -> Unit) {
                         colors = ButtonDefaults.buttonColors(containerColor = c.primary, contentColor = c.onPrimary)
                     ) {
                         if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = c.onPrimary)
-                        else Text("Kopplung starten")
+                        else Text(stringResource(R.string.pair_start))
                     }
                 }
             }

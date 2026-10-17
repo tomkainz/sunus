@@ -7,6 +7,7 @@ import android.os.Process
 import android.os.SystemClock
 import android.provider.Settings
 import de.tomkainz.sonoslive.AppState
+import de.tomkainz.sonoslive.R
 import de.tomkainz.sonoslive.shell.SubmixRecorder
 import io.github.muntashirakon.adb.AdbPairingRequiredException
 import io.github.muntashirakon.adb.AdbStream
@@ -104,7 +105,7 @@ object AdbManager {
 
         // Frisch eingeschaltet braucht der Dienst ein paar Sekunden bis zur mDNS-Ankuendigung.
         val (host, port) = findPort(context, if (switchedOn) timeoutMs + 7000 else timeoutMs)
-            ?: throw IOException("Kabelloses Debugging nicht gefunden. Ist es an und das WLAN verbunden?")
+            ?: throw IOException(context.getString(R.string.adb_not_found))
         val ok = try {
             manager.connect(host ?: hostIp(context), port)
         } catch (e: AdbPairingRequiredException) {
@@ -173,10 +174,10 @@ object AdbManager {
         val wifi = runCatching {
             Settings.Global.getInt(context.contentResolver, ADB_WIFI_ENABLED, 0) == 1
         }.getOrDefault(false)
-        return "Kabelloses Debugging an: $wifi\n" +
-            "Darf es selbst einschalten: ${canWriteSecureSettings(context)}\n" +
-            "Aufnahme ohne Dialog (PROJECT_MEDIA): ${hasProjectionPermission(context)}\n" +
-            "Mit ADB verbunden: ${isConnected(context)}"
+        return "Wireless debugging on: $wifi\n" +
+            "May turn it on itself: ${canWriteSecureSettings(context)}\n" +
+            "Capture without dialog (PROJECT_MEDIA): ${hasProjectionPermission(context)}\n" +
+            "Connected to ADB: ${isConnected(context)}"
     }
 
     fun canWriteSecureSettings(context: Context): Boolean =
@@ -234,7 +235,7 @@ object AdbManager {
         val klass = SubmixRecorder::class.java.name
         val command = "rm -f $ERROR_FILE; " +
             "CLASSPATH='$apk' app_process / $klass 2>$ERROR_FILE; " +
-            "echo \"Exit-Code: \$?\" >>$ERROR_FILE"
+            "echo \"Exit code: \$?\" >>$ERROR_FILE"
         return openShell(context, command)
     }
 
@@ -268,7 +269,7 @@ object AdbManager {
         // Kurz warten: der Exit-Code wird erst nach dem Ende des Helfers geschrieben.
         Thread.sleep(500)
         val since = String.format(java.util.Locale.ROOT, "%d.%03d", sinceMillis / 1000, sinceMillis % 1000)
-        val command = "echo '== Helfer (stderr, Exit-Code) =='; cat $ERROR_FILE 2>/dev/null; " +
+        val command = "echo '== Helper (stderr, exit code) =='; cat $ERROR_FILE 2>/dev/null; " +
             "echo; echo '== Log =='; " +
             "logcat -d -v time -t '$since' AndroidRuntime:* app_process:* DEBUG:* libc:* " +
             "AudioRecord:* AudioFlinger:E AudioPolicyManager:E *:S 2>&1 | tail -n 120"
@@ -276,7 +277,7 @@ object AdbManager {
         val text = process.input.bufferedReader().use { it.readText() }
         process.close()
         text.trim()
-    }.getOrElse { "Bericht nicht lesbar: $it" }
+    }.getOrElse { "Report not readable: $it" }
 
     private fun hostIp(context: Context): String {
         // Self-Pairing: der ADB-Dienst lauscht auf allen Schnittstellen des

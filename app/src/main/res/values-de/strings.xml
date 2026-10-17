@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_live">Stream aktiv</string>
+    <string name="channel_live_desc">Zeigt an, dass der Ton gerade zum Lautsprecher läuft</string>
+    <string name="channel_pairing">Einrichtung</string>
+
+    <!-- Hauptansicht -->
+    <string name="mode_all_apps">Alle Apps</string>
+    <string name="mode_standard">Standard</string>
+    <string name="mode_all_apps_hint">Jede App, auch gesperrte · Handy wird stumm</string>
+    <string name="mode_standard_hint">Ohne Einrichtung · manche Apps sperren die Aufnahme</string>
+    <string name="status_live">Live · %1$s</string>
+    <string name="status_live_silent">Live · %1$s · still</string>
+    <string name="status_searching">Suche Lautsprecher…</string>
+    <string name="status_no_speaker">Kein Lautsprecher gewählt</string>
+    <string name="status_ready">Bereit</string>
+    <string name="status_scanning">Durchsuche Netzwerk…</string>
+    <string name="status_connecting_adb">Verbinde ADB…</string>
+    <string name="status_live_standard">Live (Standard)</string>
+    <string name="status_live_all_apps">Live (alle Apps)</string>
+    <string name="empty_searching">Suche im WLAN…</string>
+    <string name="empty_none">Kein Sonos gefunden</string>
+    <string name="empty_hint">Tippen zum Suchen · IP unter ⋯</string>
+
+    <!-- Meldungen -->
+    <string name="report_share">Bericht teilen</string>
+    <string name="report_save">Speichern</string>
+    <string name="msg_no_consent">Ohne Zustimmung kann der Standard-Modus nicht aufnehmen.</string>
+    <string name="msg_pick_speaker">Erst einen Lautsprecher wählen.</string>
+    <string name="msg_need_record">Für den Standard-Modus die Mikrofon-/Aufnahme-Berechtigung erlauben.</string>
+    <string name="msg_need_network">Ohne die Berechtigung für das lokale Netzwerk findet die App keinen Lautsprecher.</string>
+    <string name="msg_no_speaker">Kein Lautsprecher gewählt.</string>
+    <string name="msg_no_sonos_at">Unter %1$s antwortet kein Sonos.</string>
+    <string name="msg_volume_error">Lautstärke: %1$s</string>
+
+    <!-- Mehr -->
+    <string name="more_ip">Lautsprecher per IP</string>
+    <string name="ok">OK</string>
+    <string name="more_mute">Handy stumm</string>
+    <string name="more_mute_hint">Nur Standard-Modus (Alle Apps ist immer stumm)</string>
+    <string name="hint_upnp">In der Sonos-App unter Konto &gt; Datenschutz und Sicherheit &gt; Verbindungssicherheit muss UPnP an sein (Standard).</string>
+    <string name="hint_lossless">Verlustfreie Übertragung (PCM). Der Ton kommt etwas später am Sonos an: für Musik ideal, für Videos nicht lippensynchron.</string>
+    <string name="hint_all_apps">Alle Apps: einmal \"Kabelloses Debugging\" in den Entwickleroptionen einschalten und koppeln. Kein Root nötig. Danach schaltet die App es selbst wieder ein, auch nach einem Neustart. Die Entwickleroptionen müssen an bleiben; fragt Android nach dem WLAN, \"In diesem Netzwerk immer zulassen\" ankreuzen.</string>
+    <string name="last_report">Letzter Fehlerbericht</string>
+    <string name="share">Teilen</string>
+    <string name="save_downloads">In Downloads speichern</string>
+    <string name="close">Schließen</string>
+    <string name="cancel">Abbrechen</string>
+
+    <!-- Kopplung -->
+    <string name="pair_title">Alle Apps einrichten</string>
+    <string name="pair_steps">1. Auf „Kopplung starten“ tippen. „Kabelloses Debugging“ öffnet sich.\n2. Einschalten und „Gerät mit Kopplungscode koppeln“ antippen.\n3. Den Dialog offen lassen, die Benachrichtigungsleiste herunterziehen und bei „Sunos koppeln“ den 6-stelligen Code eingeben.</string>
+    <string name="pair_hint">Den Port findet die App selbst. Sind die Entwickleroptionen noch versteckt: Einstellungen &gt; Über das Telefon &gt; 7× auf „Build-Nummer“ tippen.</string>
+    <string name="pair_port_label">Port aus dem Kopplungsdialog</string>
+    <string name="pair_port_auto">Port automatisch</string>
+    <string name="pair_port_manual">Port selbst eintragen</string>
+    <string name="pair_start">Kopplung starten</string>
+    <string name="pair_need_notifications">Bitte Benachrichtigungen erlauben, dort wird der Code eingegeben.</string>
+    <string name="pair_unlock_dev">Erst die Entwickleroptionen freischalten: 7× auf „Build-Nummer“ tippen, dann zurück und erneut „Kopplung starten“.</string>
+    <string name="pair_dev_locked">Entwickleroptionen sind noch nicht freigeschaltet.</string>
+    <string name="pair_notif_title">Sunos koppeln</string>
+    <string name="pair_notif_open">Kopplungsdialog öffnen, dann hier den Code eingeben</string>
+    <string name="pair_waiting">Warte auf den Kopplungsdialog…</string>
+    <string name="pair_timeout">Zeit abgelaufen. Bitte erneut starten.</string>
+    <string name="pair_cancelled">Kopplung abgebrochen.</string>
+    <string name="pair_found_notif">Kopplungsdialog gefunden. Jetzt den 6-stelligen Code eingeben.</string>
+    <string name="pair_found">Kopplungsdialog gefunden. Code in der Benachrichtigung eingeben.</string>
+    <string name="pair_digits_notif">Der Code hat 6 Ziffern. Bitte erneut eingeben.</string>
+    <string name="pair_digits">Der Code hat 6 Ziffern.</string>
+    <string name="pair_pairing">Kopple…</string>
+    <string name="pair_no_dialog_notif">Kein Kopplungsdialog gefunden. Ist er noch offen?</string>
+    <string name="pair_no_dialog">Kein Kopplungsdialog gefunden.</string>
+    <string name="pair_failed_notif">Kopplung fehlgeschlagen. Code prüfen; der Dialog muss offen sein.</string>
+    <string name="pair_failed">Kopplung fehlgeschlagen. Code prüfen.</string>
+    <string name="pair_connecting">Gekoppelt. Verbinde…</string>
+    <string name="pair_done">Gekoppelt. Alle Apps ist eingerichtet.</string>
+    <string name="pair_done_later">Gekoppelt. Verbindung folgt beim Start.</string>
+    <string name="pair_code_label">6-stelliger Code</string>
+    <string name="pair_enter_code">Code eingeben</string>
+    <string name="adb_not_found">Kabelloses Debugging nicht gefunden. Ist es an und das WLAN verbunden?</string>
+
+    <!-- Stream-Benachrichtigung -->
+    <string name="notif_live_text">Handy-Ton läuft auf dem Sonos</string>
+    <string name="notif_stop">Stopp</string>
+
+    <!-- Fehlercodes und Bericht -->
+    <string name="error_format">%1$s (Fehler %2$s)</string>
+    <string name="code_a1">ADB-Verbindung fehlgeschlagen. Ist \"Kabelloses Debugging\" an?</string>
+    <string name="code_a2">Der Aufnahme-Helfer ist nicht gestartet.</string>
+    <string name="code_a3">Der Aufnahme-Helfer meldet einen Fehler.</string>
+    <string name="code_a4">Unerwartete Antwort vom Aufnahme-Helfer.</string>
+    <string name="code_a5">Alle-Apps-Modus abgebrochen.</string>
+    <string name="code_s1">Aufnahme startet nicht.</string>
+    <string name="code_s2">Aufnahme abgebrochen.</string>
+    <string name="code_s3">Keine Zustimmung zur Aufnahme.</string>
+    <string name="code_d1">Keine WLAN-Adresse. Ist das Handy im WLAN?</string>
+    <string name="code_d2">Stream-Server startet nicht.</string>
+    <string name="code_d3">Der Sonos nimmt den Stream nicht an.</string>
+    <string name="code_x1">Die App ist abgestürzt.</string>
+    <string name="report_share_title">Fehlerbericht teilen</string>
+    <string name="report_saved">Gespeichert unter Downloads/%1$s</string>
+    <string name="report_save_failed">Speichern fehlgeschlagen: %1$s</string>
+</resources>

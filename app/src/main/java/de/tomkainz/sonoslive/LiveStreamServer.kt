@@ -94,7 +94,7 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
                 port = candidate
                 break
             } catch (e: IOException) {
-                if (++candidate >= preferredPort + 20) throw IOException("Kein freier Port ab $preferredPort")
+                if (++candidate >= preferredPort + 20) throw IOException("No free port from $preferredPort")
             }
         }
         serverSocket = socket

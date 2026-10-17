@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
         if (result.resultCode == RESULT_OK && data != null) {
             LiveService.startStandard(this, result.resultCode, data)
         } else {
-            AppState.message.value = "Ohne Zustimmung kann der Standard-Modus nicht aufnehmen."
+            AppState.message.value = getString(R.string.msg_no_consent)
         }
     }
 
@@ -71,14 +71,14 @@ class MainActivity : ComponentActivity() {
 
     private fun requestStart() {
         if (AppState.selected.value == null) {
-            AppState.message.value = "Erst einen Lautsprecher wählen."
+            AppState.message.value = getString(R.string.msg_pick_speaker)
             return
         }
         when (AppState.mode.value) {
             CaptureMode.STANDARD -> {
                 if (!granted(Manifest.permission.RECORD_AUDIO)) {
                     ensurePermissions()
-                    AppState.message.value = "Für den Standard-Modus die Mikrofon-/Aufnahme-Berechtigung erlauben."
+                    AppState.message.value = getString(R.string.msg_need_record)
                     return
                 }
                 val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
@@ -123,8 +123,7 @@ class MainActivity : ComponentActivity() {
     private fun refreshPermissions() {
         val networkOk = Build.VERSION.SDK_INT < 37 || granted("android.permission.ACCESS_LOCAL_NETWORK")
         if (!networkOk) {
-            AppState.message.value =
-                "Ohne die Berechtigung für das lokale Netzwerk findet die App keinen Lautsprecher."
+            AppState.message.value = getString(R.string.msg_need_network)
         }
     }
 
@@ -135,7 +134,7 @@ class MainActivity : ComponentActivity() {
      */
     private fun startPairing(manualPort: Int?) {
         if (Build.VERSION.SDK_INT >= 33 && !granted(Manifest.permission.POST_NOTIFICATIONS)) {
-            AppState.adbMessage.value = "Bitte Benachrichtigungen erlauben, dort wird der Code eingegeben."
+            AppState.adbMessage.value = getString(R.string.pair_need_notifications)
             permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
             return
         }
@@ -155,8 +154,7 @@ class MainActivity : ComponentActivity() {
             contentResolver, android.provider.Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0
         ) == 1
         if (!developerOptions) {
-            AppState.adbMessage.value = "Erst die Entwickleroptionen freischalten: 7× auf „Build-Nummer“ tippen, " +
-                "dann zurück und erneut „Kopplung starten“."
+            AppState.adbMessage.value = getString(R.string.pair_unlock_dev)
             runCatching { startActivity(Intent(android.provider.Settings.ACTION_DEVICE_INFO_SETTINGS)) }
             return
         }
@@ -186,7 +184,7 @@ class MainActivity : ComponentActivity() {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { startActivity(intent) }
             .onFailure {
-                AppState.adbMessage.value = "Entwickleroptionen sind noch nicht freigeschaltet."
+                AppState.adbMessage.value = getString(R.string.pair_dev_locked)
                 runCatching {
                     startActivity(Intent(android.provider.Settings.ACTION_DEVICE_INFO_SETTINGS))
                 }

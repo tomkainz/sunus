@@ -1,4 +1,4 @@
-# Sunus
+# Sunos
 
 **Sonos Bridge** for Android, successor to [tomkainz/sonos-bridge](https://github.com/tomkainz/sonos-bridge)
 
@@ -20,9 +20,9 @@ The app finds speakers via SSDP. If the router filters multicast, it scans the l
 
 ## Capture modes
 
-The app's interface is in German. Button names are given below in German with a translation.
+The app is in English and German. It follows the phone's language; on Android 13 and newer it can be set per app under Settings > Apps > Sunos > Language.
 
-### Alle Apps (all apps)
+### All apps
 
 Captures all media audio, including apps that block normal recording. The phone itself stays silent.
 
@@ -30,9 +30,9 @@ A small helper (`shell/SubmixRecorder`) runs with shell privileges and reads the
 
 One-time setup:
 
-1. In the app, tap **Kopplung starten** (start pairing). The **Wireless debugging** page opens.
+1. In the app, tap **Start pairing**. The **Wireless debugging** page opens.
 2. Turn it on and tap **Pair device with pairing code**.
-3. Leave the dialog open, pull down the notification shade and enter the 6-digit code in the **Sunus koppeln** notification.
+3. Leave the dialog open, pull down the notification shade and enter the 6-digit code in the **Pair Sunos** notification.
 
 The app finds the port itself via mDNS. The code is entered through the notification because Android closes the pairing dialog as soon as you leave Settings. There is no public intent for the Wireless debugging page; the app takes the same route as a long press on the Quick Settings tile. Where that isn't available, Developer options open instead.
 
@@ -40,7 +40,7 @@ While pairing, the app grants itself `WRITE_SECURE_SETTINGS` and the `PROJECT_ME
 
 ### Standard
 
-Needs no setup and uses the official `AudioPlaybackCapture` API, for which Android asks for consent on every start. Once "Alle Apps" has been set up, that prompt no longer appears. Apps may opt out of this capture; Netflix and Audible do, for example. The phone keeps playing the audio in parallel. If you don't want that, turn down the media volume on the phone; according to user reports the stream to the Sonos is not affected.
+Needs no setup and uses the official `AudioPlaybackCapture` API, for which Android asks for consent on every start. Once "All apps" has been set up, that prompt no longer appears. Apps may opt out of this capture; Netflix and Audible do, for example. The phone keeps playing the audio in parallel. If you don't want that, turn down the media volume on the phone; according to user reports the stream to the Sonos is not affected.
 
 ## Requirements
 
@@ -88,7 +88,7 @@ AGP 9.3.1, Kotlin Compose plugin 2.4.10, compileSdk 37, minSdk 29.
 
 ## Open questions
 
-- Does "Alle Apps" keep running with the screen locked?
+- Does "All apps" keep running with the screen locked?
 - Can Spotify be captured in Standard mode?
 - Does the stream stay at full level in Standard mode when the phone's media volume is at zero?
 - The latency is estimated, not measured.

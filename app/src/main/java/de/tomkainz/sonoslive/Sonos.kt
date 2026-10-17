@@ -293,5 +293,5 @@ class Sonos(val speaker: Speaker) {
             .find(xml)?.groupValues?.get(1)?.trim()
 
     private fun errorText(xml: String): String =
-        value(xml, "errorDescription") ?: value(xml, "errorCode")?.let { "(UPnP-Fehler $it)" } ?: ""
+        value(xml, "errorDescription") ?: value(xml, "errorCode")?.let { "(UPnP error $it)" } ?: ""
 }
