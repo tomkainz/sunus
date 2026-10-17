@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Netzwerk. ACCESS_LOCAL_NETWORK ist ab Android 17 Pflicht und deckt beide
          Richtungen ab: SOAP an den Sonos und den Abruf des Streams durch den
@@ -20,6 +21,18 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Erteilt sich die App einmal selbst ueber ihre ADB-Shell. Damit schaltet
+         sie "Kabelloses Debugging" nach Neustart oder WLAN-Wechsel selbst
+         wieder ein, ohne dass der Nutzer in die Entwickleroptionen muss. -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Nur um zu pruefen, ob es die Kachel "Kabelloses Debugging" gibt. -->
+    <queries>
+        <package android:name="com.android.settings" />
+    </queries>
+
     <application
         android:name=".App"
         android:allowBackup="false"
@@ -34,7 +47,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.SonosLive">
+            android:theme="@style/Theme.SonosLive.Start">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

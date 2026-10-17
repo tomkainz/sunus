@@ -59,6 +59,7 @@ class PairingService : Service() {
         }
 
         createChannel()
+        getSystemService(NotificationManager::class.java).cancel(RESULT_ID)
         intent?.getIntExtra(EXTRA_PORT, -1)?.takeIf { it > 0 }?.let { port = it }
         startForeground(
             NOTIFICATION_ID,
@@ -101,6 +102,7 @@ class PairingService : Service() {
             ?.getCharSequence(KEY_CODE)?.toString()?.filter { it.isDigit() } ?: ""
         if (code.length != 6) {
             update("Der Code hat 6 Ziffern. Bitte erneut eingeben.", withInput = true)
+            AppState.adbMessage.value = "Der Code hat 6 Ziffern."
             return
         }
         if (busy) return
@@ -139,6 +141,7 @@ class PairingService : Service() {
             AppState.setAdbPaired(true)
             AppState.requestPairing.value = false
             if (connected) {
+                AdbManager.grantSelf(this@PairingService)
                 finish("Gekoppelt. Alle Apps ist eingerichtet.")
             } else {
                 finish("Gekoppelt. Verbindung folgt beim Start.")
@@ -152,10 +155,12 @@ class PairingService : Service() {
         mdns?.stop()
         mdns = null
         handler.removeCallbacksAndMessages(null)
-        // Ergebnis kurz stehen lassen, dann aufraeumen
-        stopForeground(STOP_FOREGROUND_DETACH)
+        // Ergebnis als eigene Benachrichtigung. Die laufende nach
+        // STOP_FOREGROUND_DETACH zu ueberschreiben ging im Emulator verloren:
+        // "Gekoppelt. Verbinde..." blieb stehen, obwohl alles fertig war.
+        stopForeground(STOP_FOREGROUND_REMOVE)
         getSystemService(NotificationManager::class.java)
-            .notify(NOTIFICATION_ID, notification(message, withInput = false, ongoing = false))
+            .notify(RESULT_ID, notification(message, withInput = false, ongoing = false))
         stopSelf()
     }
 
@@ -171,8 +176,8 @@ class PairingService : Service() {
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
         val builder = Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Sonos Live koppeln")
+            .setSmallIcon(R.drawable.ic_stat_logo)
+            .setContentTitle("Sunus koppeln")
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
             .setContentIntent(open)
@@ -188,13 +193,14 @@ class PairingService : Service() {
                 Intent(this, PairingService::class.java).setAction(ACTION_CODE),
                 PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
-            val icon = Icon.createWithResource(this, R.drawable.ic_launcher_foreground)
+            val icon = Icon.createWithResource(this, R.drawable.ic_stat_logo)
             builder.addAction(
                 Notification.Action.Builder(icon, "Code eingeben", reply)
                     .addRemoteInput(input)
                     .build()
             )
         }
+        if (!ongoing) builder.setAutoCancel(true).setTimeoutAfter(RESULT_VISIBLE_MS)
         if (ongoing) {
             val cancel = PendingIntent.getService(
                 this, 2,
@@ -219,6 +225,8 @@ class PairingService : Service() {
     companion object {
         private const val CHANNEL_ID = "sonos-live-pairing"
         private const val NOTIFICATION_ID = 2
+        private const val RESULT_ID = 3
+        private const val RESULT_VISIBLE_MS = 60_000L
         private const val KEY_CODE = "code"
         private const val ACTION_CODE = "de.tomkainz.sonoslive.PAIR_CODE"
         private const val ACTION_CANCEL = "de.tomkainz.sonoslive.PAIR_CANCEL"

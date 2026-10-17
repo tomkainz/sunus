@@ -12,8 +12,8 @@ android {
         // AudioPlaybackCapture gibt es ab Android 10
         minSdk = 29
         targetSdk = 37
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 8
+        versionName = "1.7"
     }
 
     // Der Schluessel liegt nur lokal, nicht im Repository. Fehlt er, entsteht

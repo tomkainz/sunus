@@ -3,6 +3,7 @@ package de.tomkainz.sonoslive
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -50,6 +53,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -93,12 +98,25 @@ fun SonosLiveApp(
                 .padding(horizontal = 20.dp)
                 .padding(top = 12.dp, bottom = 200.dp)
         ) {
+            // App-Symbol als Kachel: der dunkle Grund haelt die helle Linie
+            // des Logos auch im hellen Design sichtbar.
+            Box(
+                Modifier
+                    .padding(top = 20.dp)
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFF181818))
+                    .align(Alignment.CenterHorizontally),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(painterResource(R.drawable.logo_mark), contentDescription = null, modifier = Modifier.width(48.dp))
+            }
             Text(
-                "Sonos Live",
+                "Sunus",
                 style = MaterialTheme.typography.headlineMedium,
                 color = c.onBackground,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 36.dp)
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 32.dp)
             )
 
             if (speakers.isEmpty()) {
@@ -306,12 +324,25 @@ private fun IconSpot(onClick: () -> Unit, content: @Composable () -> Unit) {
     Box(Modifier.size(48.dp).clickable(onClick = onClick), contentAlignment = Alignment.Center) { content() }
 }
 
+/** Meldung; Tippen schliesst sie. Bei Fehlern mit Code gibt es den Bericht dazu. */
 @Composable
 private fun Snackbar(text: String, modifier: Modifier) {
     val c = MaterialTheme.colorScheme
-    Surface(modifier.padding(horizontal = 24.dp), shape = RoundedCornerShape(14.dp), color = c.surfaceContainerHigh) {
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = c.onSurface, textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp))
+    val context = LocalContext.current
+    val withReport = text.contains("(Fehler SL-")
+    Surface(
+        modifier.padding(horizontal = 24.dp).clickable { AppState.message.value = null },
+        shape = RoundedCornerShape(14.dp), color = c.surfaceContainerHigh
+    ) {
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text, style = MaterialTheme.typography.bodyMedium, color = c.onSurface, textAlign = TextAlign.Center)
+            if (withReport) {
+                Row {
+                    TextButton(onClick = { Diagnose.share(context) }) { Text("Bericht teilen") }
+                    TextButton(onClick = { Diagnose.saveToDownloads(context) }) { Text("Speichern") }
+                }
+            }
+        }
     }
 }
 
@@ -321,6 +352,8 @@ private fun Snackbar(text: String, modifier: Modifier) {
 private fun MoreSheet(mode: CaptureMode, running: Boolean, onAddManual: (String) -> Unit, onClose: () -> Unit) {
     val c = MaterialTheme.colorScheme
     val muteLocal by AppState.muteLocal.collectAsStateWithLifecycle()
+    val report by AppState.report.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     var ip by remember { mutableStateOf("") }
 
     Box(
@@ -373,7 +406,24 @@ private fun MoreSheet(mode: CaptureMode, running: Boolean, onAddManual: (String)
                     "für Musik ideal, für Videos nicht lippensynchron.")
                 if (mode == CaptureMode.ALL_APPS) {
                     Hint("Alle Apps: einmal \"Kabelloses Debugging\" in den Entwickleroptionen einschalten " +
-                        "und koppeln. Kein Root nötig.")
+                        "und koppeln. Kein Root nötig. Danach schaltet die App es selbst wieder ein, " +
+                        "auch nach einem Neustart. Die Entwickleroptionen müssen an bleiben; fragt Android " +
+                        "nach dem WLAN, \"In diesem Netzwerk immer zulassen\" ankreuzen.")
+                }
+
+                if (report != null) {
+                    HorizontalDivider(color = c.outlineVariant)
+                    Text("Letzter Fehlerbericht", style = MaterialTheme.typography.labelSmall, color = c.onSurfaceVariant)
+                    Text(
+                        report!!.lineSequence().drop(1).take(2).joinToString("\n") { it.substringAfter(":").trim() },
+                        style = MaterialTheme.typography.bodyMedium, color = c.onSurface
+                    )
+                    Row {
+                        TextButton(onClick = { Diagnose.share(context) }) { Text("Teilen") }
+                        TextButton(onClick = { Diagnose.saveToDownloads(context); onClose() }) {
+                            Text("In Downloads speichern")
+                        }
+                    }
                 }
 
                 TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End)) { Text("Schließen") }
@@ -397,13 +447,19 @@ private fun PairingDialog(onStartPairing: (Int?) -> Unit) {
     var manual by remember { mutableStateOf(false) }
     var port by remember { mutableStateOf("") }
 
-    Box(Modifier.fillMaxSize().background(Color(0xCC000000)).padding(20.dp), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.fillMaxSize().background(Color(0xCC000000)).imePadding().padding(20.dp),
+        contentAlignment = Alignment.Center
+    ) {
         Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = c.surfaceContainerHigh) {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()).padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 Text("Alle Apps einrichten", style = MaterialTheme.typography.titleMedium, color = c.onSurface)
-                Text("1. Auf „Kopplung starten“ tippen. Die Entwickleroptionen öffnen sich.\n" +
-                    "2. „Kabelloses Debugging“ einschalten, antippen und „Gerät mit Kopplungscode koppeln“ wählen.\n" +
-                    "3. Den Dialog offen lassen, die Benachrichtigungsleiste herunterziehen und bei „Sonos Live koppeln“ " +
+                Text("1. Auf „Kopplung starten“ tippen. „Kabelloses Debugging“ öffnet sich.\n" +
+                    "2. Einschalten und „Gerät mit Kopplungscode koppeln“ antippen.\n" +
+                    "3. Den Dialog offen lassen, die Benachrichtigungsleiste herunterziehen und bei „Sunus koppeln“ " +
                     "den 6-stelligen Code eingeben.",
                     style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
                 Text("Den Port findet die App selbst. Sind die Entwickleroptionen noch versteckt: " +
@@ -422,11 +478,12 @@ private fun PairingDialog(onStartPairing: (Int?) -> Unit) {
 
                 adbMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = c.primary) }
 
+                // Eigene Zeile: zu dritt in einer Zeile brach "Kopplung starten" mehrfach um.
+                TextButton(onClick = { manual = !manual }) {
+                    Text(if (manual) "Port automatisch" else "Port selbst eintragen",
+                        style = MaterialTheme.typography.labelSmall)
+                }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { manual = !manual }) {
-                        Text(if (manual) "Port automatisch" else "Port selbst eintragen",
-                            style = MaterialTheme.typography.labelSmall)
-                    }
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = { AppState.requestPairing.value = false }) { Text("Schließen") }
                     Spacer(Modifier.width(4.dp))

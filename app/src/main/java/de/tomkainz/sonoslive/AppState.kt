@@ -49,6 +49,9 @@ object AppState {
     val running = MutableStateFlow(false)
     val status = MutableStateFlow("Bereit")
     val message = MutableStateFlow<String?>(null)
+
+    /** Letzter Fehlerbericht (siehe [Diagnose]), zum Teilen oder Speichern. */
+    val report = MutableStateFlow<String?>(null)
     val streamUrl = MutableStateFlow<String?>(null)
     val clients = MutableStateFlow(0)
     val lastClient = MutableStateFlow<String?>(null)
@@ -182,6 +185,7 @@ object AppState {
 
     fun log(line: String) {
         val stamped = "${timeFormat.format(Date())}  $line"
+        android.util.Log.i("Sunus", line)
         requestLog.value = (listOf(stamped) + requestLog.value).take(8)
     }
 }

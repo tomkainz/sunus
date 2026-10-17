@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ab Android 12 zeichnet das System den Startbildschirm selbst: das Logo
+         ohne Kachel auf Schwarz statt des Symbols auf seiner grauen Flaeche. -->
+    <style name="Theme.SonosLive.Start">
+        <item name="android:windowBackground">@drawable/splash_window</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowSplashScreenBackground">#000000</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+    </style>
+</resources>

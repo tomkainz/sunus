@@ -76,7 +76,7 @@ public class AdbKeyManager extends AbsAdbConnectionManager {
             PublicKey publicKey = pair.getPublic();
             privateKey = pair.getPrivate();
 
-            String subject = "CN=Sonos Live";
+            String subject = "CN=Sunus";
             String algorithm = "SHA512withRSA";
             // 10 Jahre; der Schluessel soll die Kopplung ueberdauern
             long expiry = System.currentTimeMillis() + 10L * 365 * 86400_000L;
@@ -123,7 +123,7 @@ public class AdbKeyManager extends AbsAdbConnectionManager {
     @NonNull
     @Override
     protected String getDeviceName() {
-        return "SonosLive";
+        return "Sunus";
     }
 
     @Nullable

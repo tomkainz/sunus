@@ -53,10 +53,11 @@ class LiveService : Service() {
             }
         }
 
+        Diagnose.beginSession()
         val modeName = intent?.getStringExtra(EXTRA_MODE) ?: CaptureMode.ALL_APPS.name
         val mode = runCatching { CaptureMode.valueOf(modeName) }.getOrDefault(CaptureMode.ALL_APPS)
 
-        startInForeground()
+        startInForeground(standard = mode == CaptureMode.STANDARD)
         acquireWifiLock()
 
         val speaker = AppState.selected.value
@@ -68,7 +69,7 @@ class LiveService : Service() {
 
         val ip = Net.localIp(this)
         if (ip == null) {
-            AppState.message.value = "Keine WLAN-Adresse. Ist das Handy im WLAN?"
+            Diagnose.fail(this, Diagnose.Code.D1)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -77,7 +78,7 @@ class LiveService : Service() {
         try {
             srv.start()
         } catch (e: Exception) {
-            AppState.message.value = "Server-Start fehlgeschlagen: ${e.message}"
+            Diagnose.fail(this, Diagnose.Code.D2, e.message, e.stackTraceToString())
             stopSelf()
             return START_NOT_STICKY
         }
@@ -89,6 +90,9 @@ class LiveService : Service() {
         streamUrl = "$base${LiveStreamServer.PATH}"
         AppState.streamUrl.value = streamUrl
 
+        // Alte Meldung jetzt loeschen, nicht erst nach dem Start: die Aufnahme
+        // laeuft in einem eigenen Thread und kann schon vorher scheitern.
+        AppState.message.value = null
         val eng = CaptureEngine(this, srv)
         engine = eng
 
@@ -96,7 +100,7 @@ class LiveService : Service() {
             CaptureMode.STANDARD -> {
                 val proj = buildProjection(intent)
                 if (proj == null) {
-                    AppState.message.value = "Keine Zustimmung zur Aufnahme."
+                    Diagnose.fail(this, Diagnose.Code.S3)
                     stopSelf()
                     return START_NOT_STICKY
                 }
@@ -116,7 +120,6 @@ class LiveService : Service() {
         }
 
         AppState.running.value = true
-        AppState.message.value = null
         pointSonosAtStream()
         startWatchdog()
         return START_STICKY
@@ -141,7 +144,7 @@ class LiveService : Service() {
                 target.playStream(url)
                 AppState.refreshVolume()
             } catch (e: Exception) {
-                AppState.message.value = "Sonos: ${e.message}"
+                Diagnose.fail(this@LiveService, Diagnose.Code.D3, e.message, e.stackTraceToString())
             }
         }
     }
@@ -236,12 +239,23 @@ class LiveService : Service() {
 
     // ---- Vordergrund ------------------------------------------------------
 
-    private fun startInForeground() {
+    /**
+     * Der Diensttyp muss zur Betriebsart passen. mediaProjection darf nur
+     * gesetzt werden, wenn die Aufnahme-Zustimmung wirklich vorliegt (Standard-
+     * Modus, die Activity hat sie gerade eingeholt). Sonst lehnt Android ab
+     * Android 14 den Start mit einer SecurityException ab ("all of the
+     * permissions [FOREGROUND_SERVICE_MEDIA_PROJECTION] any of
+     * [CAPTURE_VIDEO_OUTPUT, android:project_media]") und die App stuerzt ab.
+     * Im Alle-Apps-Modus gibt es keine Projektion, dort genuegt connectedDevice.
+     */
+    private fun startInForeground(standard: Boolean) {
         val notification = buildNotification()
         if (Build.VERSION.SDK_INT >= 29) {
-            var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
-            if (Build.VERSION.SDK_INT >= 30) {
-                type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            val type = if (standard) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            } else {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
             }
             startForeground(NOTIFICATION_ID, notification, type)
         } else {
@@ -258,9 +272,9 @@ class LiveService : Service() {
             PendingIntent.FLAG_IMMUTABLE
         )
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("Sonos Live")
+            .setContentTitle("Sunus")
             .setContentText("Handy-Ton läuft auf dem Sonos")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_logo)
             .setContentIntent(open)
             .addAction(Notification.Action.Builder(null, "Stopp", stop).build())
             .setOngoing(true)

@@ -1,16 +1,20 @@
 package de.tomkainz.sonoslive
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
+import android.service.quicksettings.TileService
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import de.tomkainz.sonoslive.adb.AdbManager
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -30,6 +34,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Gestartet wird mit dem schwarzen Startbild (Theme.SonosLive.Start).
+        setTheme(R.style.Theme_SonosLive)
         super.onCreate(savedInstanceState)
 
         setContent {
@@ -53,6 +59,12 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         refreshPermissions()
+        // ADB schon beim Oeffnen verbinden: die Suche nach dem Port dauert
+        // einige Sekunden, "Start" geht dann sofort los.
+        if (AppState.mode.value == CaptureMode.ALL_APPS && AppState.adbPaired.value && !AppState.running.value) {
+            val app = applicationContext
+            AppState.scope.launch { runCatching { AdbManager.connect(app) } }
+        }
     }
 
     // ---- Start der gewaehlten Betriebsart --------------------------------
@@ -118,7 +130,7 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Startet die Kopplung: Dienst mit Code-Benachrichtigung und Port-Suche,
-     * dann die Entwickleroptionen. Ohne Benachrichtigungen geht es nicht, weil
+     * dann "Kabelloses Debugging". Ohne Benachrichtigungen geht es nicht, weil
      * der Code dort eingegeben wird.
      */
     private fun startPairing(manualPort: Int?) {
@@ -128,6 +140,41 @@ class MainActivity : ComponentActivity() {
             return
         }
         PairingService.start(this, manualPort)
+        openWirelessDebugging()
+    }
+
+    /**
+     * Oeffnet direkt die Seite "Kabelloses Debugging", auf der "Geraet mit
+     * Kopplungscode koppeln" steht. Dafuer gibt es keine oeffentliche Absicht;
+     * der Weg ist derselbe wie beim langen Druck auf die Schnelleinstellungs-
+     * Kachel (im Emulator mit Android 17 geprueft). Fehlt die Kachel, etwa bei
+     * aelteren Versionen oder anderen Herstellern: Entwickleroptionen.
+     */
+    private fun openWirelessDebugging() {
+        val developerOptions = android.provider.Settings.Global.getInt(
+            contentResolver, android.provider.Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0
+        ) == 1
+        if (!developerOptions) {
+            AppState.adbMessage.value = "Erst die Entwickleroptionen freischalten: 7× auf „Build-Nummer“ tippen, " +
+                "dann zurück und erneut „Kopplung starten“."
+            runCatching { startActivity(Intent(android.provider.Settings.ACTION_DEVICE_INFO_SETTINGS)) }
+            return
+        }
+        val tile = ComponentName(SETTINGS, "$SETTINGS.development.qstile.AdbWirelessDebuggingDevelopmentTile")
+        // Entwickler-Kacheln sind ausgeschaltet, bis man sie hinzufuegt; es geht nur darum, ob es sie gibt.
+        val hasTile = runCatching {
+            packageManager.getServiceInfo(tile, PackageManager.MATCH_DISABLED_COMPONENTS)
+        }.isSuccess
+        if (hasTile) {
+            val intent = Intent(TileService.ACTION_QS_TILE_PREFERENCES)
+                .setClassName(SETTINGS, "$SETTINGS.qstile.QSTileLongPressGatewayActivity")
+                .putExtra(Intent.EXTRA_COMPONENT_NAME, tile)
+            val opened = runCatching { startActivity(intent) }
+            if (opened.isSuccess) return
+            AppState.log("Kabelloses Debugging nicht direkt zu öffnen: ${opened.exceptionOrNull()}")
+        } else {
+            AppState.log("Keine Kachel für Kabelloses Debugging, öffne Entwickleroptionen")
+        }
         openDeveloperOptions()
     }
 
@@ -144,5 +191,9 @@ class MainActivity : ComponentActivity() {
                     startActivity(Intent(android.provider.Settings.ACTION_DEVICE_INFO_SETTINGS))
                 }
             }
+    }
+
+    private companion object {
+        const val SETTINGS = "com.android.settings"
     }
 }

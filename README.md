@@ -1,6 +1,6 @@
 # Sonos Bridge 2.0
 
-Android-App, die den Ton des Handys live auf einem Sonos-Lautsprecher abspielt. Das Handy übernimmt dabei die Rolle eines Bluetooth-Zuspielers, nur über WLAN und ohne zusätzlichen Rechner. Auf dem Handy heißt die App „Sonos Live“.
+Android-App, die den Ton des Handys live auf einem Sonos-Lautsprecher abspielt. Das Handy übernimmt dabei die Rolle eines Bluetooth-Zuspielers, nur über WLAN und ohne zusätzlichen Rechner. Auf dem Handy heißt die App „Sunus“.
 
 Die erste Version, [sonos-bridge](https://github.com/tomkainz/sonos-bridge), brauchte einen Linux-Rechner als Bluetooth-Empfänger. Diese Rolle übernimmt jetzt das Handy selbst.
 
@@ -20,15 +20,17 @@ Ein kleiner Helfer (`shell/SubmixRecorder`) läuft mit Shell-Rechten und liest d
 
 Einmalige Einrichtung:
 
-1. In der App auf „Kopplung starten“ tippen. Die Entwickleroptionen öffnen sich.
-2. „Kabelloses Debugging“ einschalten, antippen und „Gerät mit Kopplungscode koppeln“ wählen.
-3. Den Dialog offen lassen, die Benachrichtigungsleiste herunterziehen und bei „Sonos Live koppeln“ den 6-stelligen Code eingeben.
+1. In der App auf „Kopplung starten“ tippen. Die Seite „Kabelloses Debugging“ öffnet sich.
+2. Einschalten und „Gerät mit Kopplungscode koppeln“ antippen.
+3. Den Dialog offen lassen, die Benachrichtigungsleiste herunterziehen und bei „Sunus koppeln“ den 6-stelligen Code eingeben.
 
-Den Port sucht die App selbst per mDNS. Der Code wird über die Benachrichtigung abgefragt, weil Android den Kopplungsdialog schließt, sobald man die Einstellungen verlässt. Nach einem Neustart des Handys muss „Kabelloses Debugging“ wieder eingeschaltet werden, die Kopplung selbst bleibt erhalten. Diese Betriebsart setzt Android 12 voraus.
+Den Port sucht die App selbst per mDNS. Der Code wird über die Benachrichtigung abgefragt, weil Android den Kopplungsdialog schließt, sobald man die Einstellungen verlässt. Eine öffentliche Absicht für die Seite „Kabelloses Debugging“ gibt es nicht. Die App nimmt denselben Weg wie ein langer Druck auf die Schnelleinstellungs-Kachel. Wo das nicht geht, öffnen sich die Entwickleroptionen.
+
+Beim Koppeln erteilt sich die App über die Shell einmalig `WRITE_SECURE_SETTINGS` und die Freigabe `PROJECT_MEDIA`. Damit schaltet sie „Kabelloses Debugging“ nach einem Neustart oder WLAN-Wechsel selbst wieder ein, wie Shizuku ab Version 13.6. Voraussetzung: Die Entwickleroptionen bleiben an, und das WLAN wurde einmal mit „In diesem Netzwerk immer zulassen“ bestätigt. Den ADB-Port merkt sich die App; mit bekanntem Port steht die Verbindung in einem Bruchteil einer Sekunde, sonst sucht sie ihn per mDNS. Diese Betriebsart setzt Android 12 voraus.
 
 ### Standard
 
-Kommt ohne Einrichtung aus und nutzt die offizielle Schnittstelle `AudioPlaybackCapture`, für die Android bei jedem Start eine Zustimmung verlangt. Apps dürfen sich dieser Aufnahme entziehen, Netflix und Audible tun das zum Beispiel. Am Handy läuft der Ton parallel weiter. Wer das nicht will, dreht dort die Medienlautstärke herunter; nach Erfahrungsberichten bleibt der Stream zum Sonos davon unberührt.
+Kommt ohne Einrichtung aus und nutzt die offizielle Schnittstelle `AudioPlaybackCapture`, für die Android bei jedem Start eine Zustimmung verlangt. Ist „Alle Apps“ einmal eingerichtet, entfällt diese Abfrage. Apps dürfen sich dieser Aufnahme entziehen, Netflix und Audible tun das zum Beispiel. Am Handy läuft der Ton parallel weiter. Wer das nicht will, dreht dort die Medienlautstärke herunter; nach Erfahrungsberichten bleibt der Stream zum Sonos davon unberührt.
 
 ## Voraussetzungen
 
@@ -42,6 +44,10 @@ Getestet mit Android 17 und einem Sonos Play:1 mit S2-Software.
 ## Verzögerung
 
 Der Stream ist verlustfrei, kommt aber geschätzt ein bis drei Sekunden später am Lautsprecher an. Den größten Teil davon puffert vermutlich der Sonos selbst. Bei Musik stört das nicht, bei Videos laufen Bild und Ton auseinander.
+
+## Fehlercodes
+
+Scheitert ein Start, zeigt die App einen Code wie `SL-A1` an. Dazu legt sie einen Fehlerbericht mit Gerät, Android-Version und den Log-Zeilen des Helfers an. Er lässt sich direkt aus der Meldung oder unter „⋯“ teilen oder in „Downloads“ speichern.
 
 ## Installation
 
@@ -66,6 +72,7 @@ AGP 9.3.1, Kotlin-Compose-Plugin 2.4.10, compileSdk 37, minSdk 29.
 - `CaptureEngine.kt`: Aufnahme in beiden Betriebsarten
 - `LiveService.kt`: Vordergrunddienst und Verbindungskontrolle
 - `adb/`: Kopplung und Start des Helfers
+- `Diagnose.kt`: Fehlercodes und Fehlerbericht
 - `shell/`: der Helfer, der als Shell-Prozess läuft
 - `Ui.kt`, `MainActivity.kt`: Oberfläche und Berechtigungen
 
