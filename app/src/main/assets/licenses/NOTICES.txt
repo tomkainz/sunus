@@ -27,9 +27,8 @@ https://github.com/MuntashirAkon/spake2-c
 Copyright 2021 Muntashir Al-Islam
 Licensed under the GNU Lesser General Public License v3.0 (see
 LGPL-3.0.txt and GPL-3.0.txt). The library is used unmodified. Its source
-code is available at the addresses above and is attached to every Sunus
-release on GitHub; you may replace it with a modified version by building
-Sunus from source.
+code is available at the addresses above; you may replace it with a
+modified version by building Sunus from source.
 The native part (libspake2.so) contains:
 - spake2.c, ed25519.h: Copyright (c) 2020, Google Inc.;
   Copyright (c) 2021, Muntashir Al-Islam. ISC License (text below).
@@ -48,8 +47,7 @@ Based on sun.security from OpenJDK. Copyright (c) Oracle and/or its
 affiliates.
 Licensed under the GNU General Public License v2.0 with the "Classpath"
 exception (see GPL-2.0.txt). The library is used unmodified. Its source
-code is available at the address above and is attached to every Sunus
-release on GitHub.
+code is available at the address above.
 
 
 Bouncy Castle (bcprov-jdk15to18) 1.81

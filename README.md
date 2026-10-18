@@ -109,6 +109,6 @@ Three source files are adapted from Apache-2.0 projects and stay under the Apach
 | [scrcpy](https://github.com/Genymobile/scrcpy) | template for the shell helper | Apache-2.0 |
 | AndroidX, Jetpack Compose, Kotlin, kotlinx.coroutines | app framework | Apache-2.0 |
 
-All libraries are used unmodified. The Classpath exception keeps GPL-2.0 from extending to Sunus. To swap the LGPL library for a modified version, build Sunus from source. The source code of sun-security-android and spake2 is attached to every release.
+All libraries are used unmodified. The Classpath exception keeps GPL-2.0 from extending to Sunus. To swap the LGPL library for a modified version, build Sunus from source.
 
 Copyright notices and the full license texts are in [`app/src/main/assets/licenses`](app/src/main/assets/licenses) and in the app under "⋯" > **Open-source licenses**.
