@@ -59,7 +59,7 @@ If a start fails, the app shows a code such as `SL-A1` and writes an error repor
 
 ## Installation
 
-Download the APK from the [Releases page](https://github.com/tomkainz/sunus/releases). Copy it to the phone, open it in a file manager and allow installs from unknown sources once.
+Download the APK from the [Releases page](https://github.com/tomkainz/sunus/releases).
 
 ## Building
 
