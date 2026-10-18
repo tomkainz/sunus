@@ -21,11 +21,12 @@
 
 package de.tomkainz.sonoslive.shell;
 
-import android.annotation.TargetApi;
 import android.content.AttributionSource;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.os.Build;
+
+import androidx.annotation.RequiresApi;
 
 /**
  * Context that poses as com.android.shell (uid 2000).
@@ -59,7 +60,7 @@ final class ShellContext extends ContextWrapper {
         return PACKAGE_NAME;
     }
 
-    @TargetApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.S)
     @Override
     public AttributionSource getAttributionSource() {
         return new AttributionSource.Builder(SHELL_UID).setPackageName(PACKAGE_NAME).build();

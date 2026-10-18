@@ -14,7 +14,7 @@ I built this app with the help of AI. Plenty of people are skeptical about that,
 
 ## How it works
 
-The app captures the audio and serves it at `http://<phone>:8090/live.wav` as an endless WAV stream (PCM, 16 bit, 48 kHz, uncompressed). Via UPnP on port 1400 the Sonos is given this address and pulls the stream. Every few seconds the app checks whether the speaker is still on the stream and reconnects it after a dropout. Choosing a different source in the Sonos app ends the stream as well.
+The app captures the audio and serves it at `http://<phone>:8090/live.wav` as an endless WAV stream (PCM, 16 bit, 48 kHz, uncompressed). Via UPnP on port 1400 the Sonos is given this address and pulls the stream. Only Sonos speakers on the network may fetch the stream; other devices get an error. Every few seconds the app checks whether the speaker is still on the stream and reconnects it after a dropout. Choosing a different source in the Sonos app ends the stream as well.
 
 The app finds speakers via SSDP. If the router filters multicast, it scans the local subnet on port 1400. As a last resort the IP can be entered by hand.
 
@@ -34,7 +34,7 @@ One-time setup:
 
 The app finds the port itself via mDNS. You enter the code in the notification because Android closes the pairing dialog as soon as you leave Settings. There is no public intent for the Wireless debugging page; the app takes the same route as a long press on the Quick Settings tile. Where that isn't available, Developer options open instead.
 
-During pairing the app uses the shell once to grant itself `WRITE_SECURE_SETTINGS` and the `PROJECT_MEDIA` app op. That lets it turn Wireless debugging back on after a reboot or a Wi-Fi change, as Shizuku has done since version 13.6. Requirements: Developer options stay enabled, and the Wi-Fi network was confirmed once with "Always allow on this network". The app remembers the ADB port. With a known port the connection is up in a fraction of a second; otherwise it searches via mDNS. This mode requires Android 12.
+During pairing the app uses the shell once to grant itself `WRITE_SECURE_SETTINGS` and the `PROJECT_MEDIA` app op. That lets it turn Wireless debugging back on after a reboot or a Wi-Fi change, as Shizuku has done since version 13.6. It also sets `adb_allowed_connection_time` to 0, so the pairing does not expire after a week without use. That setting applies to every ADB authorization on the phone, including computers; "Revoke USB debugging authorizations" in Developer options still removes them all. Requirements: Developer options stay enabled, and the Wi-Fi network was confirmed once with "Always allow on this network". The app remembers the ADB port. With a known port the connection is up in a fraction of a second; otherwise it searches via mDNS. This mode requires Android 12.
 
 ### Standard
 
@@ -69,7 +69,7 @@ You need JDK 21 and the Android SDK with platform 37. Set the SDK path via `ANDR
 gradlew.bat assembleRelease
 ```
 
-Release builds are signed with `keystore/sonoslive.jks`. The key is not in the repository; without it, `gradlew.bat assembleDebug` produces an installable debug APK.
+Release builds are signed with `keystore/sonoslive.jks`, whose password is read from `sunus.keystore.password` in `local.properties`. Neither is in the repository; without them, `gradlew.bat assembleDebug` produces an installable debug APK.
 
 AGP 9.3.1, Kotlin Compose plugin 2.4.10, compileSdk 37, minSdk 29.
 
@@ -109,6 +109,6 @@ Three source files are adapted from Apache-2.0 projects and stay under the Apach
 | [scrcpy](https://github.com/Genymobile/scrcpy) | template for the shell helper | Apache-2.0 |
 | AndroidX, Jetpack Compose, Kotlin, kotlinx.coroutines | app framework | Apache-2.0 |
 
-All libraries are used unmodified. The Classpath exception keeps GPL-2.0 from extending to Sunus. To swap the LGPL library for a modified version, build Sunus from source.
+All libraries are used unmodified. The Classpath exception keeps GPL-2.0 from extending to Sunus. To swap the LGPL library for a modified version, build Sunus from source. The source code of sun-security-android and spake2 is attached to every release.
 
 Copyright notices and the full license texts are in [`app/src/main/assets/licenses`](app/src/main/assets/licenses) and in the app under "⋯" > **Open-source licenses**.

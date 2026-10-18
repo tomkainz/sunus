@@ -1,10 +1,13 @@
 package de.tomkainz.sonoslive
 
 import android.content.Context
+import android.os.Build
 import android.content.SharedPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -29,7 +32,10 @@ object AppState {
     val selected = MutableStateFlow<Speaker?>(null)
     val searching = MutableStateFlow(false)
 
-    val mode = MutableStateFlow(CaptureMode.ALL_APPS)
+    /** The shell helper reads REMOTE_SUBMIX, which needs Android 12. */
+    val allAppsSupported = Build.VERSION.SDK_INT >= 31
+
+    val mode = MutableStateFlow(if (allAppsSupported) CaptureMode.ALL_APPS else CaptureMode.STANDARD)
     val muteLocal = MutableStateFlow(true)
     val streamBaseOverride = MutableStateFlow("")
 
@@ -72,6 +78,7 @@ object AppState {
         status.value = text(R.string.status_ready)
         mode.value = runCatching { CaptureMode.valueOf(prefs.getString("mode", null)!!) }
             .getOrDefault(CaptureMode.ALL_APPS)
+            .takeIf { allAppsSupported } ?: CaptureMode.STANDARD
         muteLocal.value = prefs.getBoolean("muteLocal", true)
         streamBaseOverride.value = prefs.getString("streamBase", "") ?: ""
         adbPaired.value = prefs.getBoolean("adbPaired", false)
@@ -88,6 +95,7 @@ object AppState {
     }
 
     fun setMode(m: CaptureMode) {
+        if (m == CaptureMode.ALL_APPS && !allAppsSupported) return
         mode.value = m
         prefs.edit().putString("mode", m.name).apply()
     }
@@ -180,11 +188,20 @@ object AppState {
         }
     }
 
+    private var volumeJob: Job? = null
+
+    /**
+     * The slider calls this for every frame of a drag. Only the last value is
+     * sent, shortly after, so requests cannot overtake each other.
+     */
     fun setVolume(v: Int) {
         val speaker = selected.value ?: return
-        volume.value = v.coerceIn(0, 100)
-        scope.launch {
-            runCatching { Sonos(speaker).setVolume(v) }
+        val value = v.coerceIn(0, 100)
+        volume.value = value
+        volumeJob?.cancel()
+        volumeJob = scope.launch {
+            delay(150)
+            runCatching { Sonos(speaker).setVolume(value) }
                 .onFailure { message.value = text(R.string.msg_volume_error, it.message ?: "") }
         }
     }

@@ -8,6 +8,7 @@
     <string name="mode_all_apps">Alle Apps</string>
     <string name="mode_standard">Standard</string>
     <string name="mode_all_apps_hint">Jede App, auch gesperrte · Handy wird stumm</string>
+    <string name="mode_all_apps_unavailable">Ohne Einrichtung · Alle Apps braucht Android 12 oder neuer</string>
     <string name="mode_standard_hint">Ohne Einrichtung · manche Apps sperren die Aufnahme</string>
     <string name="status_live">Live · %1$s</string>
     <string name="status_live_silent">Live · %1$s · still</string>

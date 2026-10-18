@@ -21,7 +21,9 @@ import de.tomkainz.sonoslive.adb.AdbManager
  */
 class CaptureEngine(
     private val context: Context,
-    private val server: LiveStreamServer
+    private val server: LiveStreamServer,
+    /** Called when capture ends by itself (error, helper gone), not after [stop]. */
+    private val onEnded: () -> Unit
 ) {
     @Volatile
     private var running = false
@@ -60,6 +62,9 @@ class CaptureEngine(
             Thread({
                 helper.close()
                 AdbManager.stopHelper(context)
+                // Ends Android's "Wireless debugging connected" notice; the next
+                // start reconnects within a fraction of a second.
+                AdbManager.disconnect(context)
             }, "helper-stop").start()
         }
         thread?.interrupt()
@@ -103,16 +108,22 @@ class CaptureEngine(
             val buffer = ByteArray(1024 * LiveStreamServer.CHANNELS * 2)
             while (running) {
                 val n = recorder.read(buffer, 0, buffer.size)
-                if (n > 0) server.offer(buffer, n) else if (n < 0) break
+                if (n > 0) server.offer(buffer, n) else if (n < 0) {
+                    if (running) Diagnose.fail(context, Diagnose.Code.S2, "AudioRecord.read = $n")
+                    break
+                }
             }
         } catch (e: Exception) {
             if (running) Diagnose.fail(context, Diagnose.Code.S2, e.message, e.stackTraceToString())
+        } finally {
+            if (running) onEnded()
         }
     }
 
     // ---- All apps (shell helper) -----------------------------------------
 
     private fun runAllApps() {
+        var process: AdbManager.ShellProcess? = null
         try {
             AppState.status.value = context.getString(R.string.status_connecting_adb)
             val connected = try {
@@ -127,13 +138,17 @@ class CaptureEngine(
                 AppState.needsPairing()
                 return
             }
+            // Stop was pressed while connecting: do not start the helper at all.
+            if (!running) return
             AdbManager.grantSelf(context)
             // Clean up leftovers from an earlier run (for example after an app crash).
             AdbManager.stopHelper(context)
             val startedAt = System.currentTimeMillis()
-            val process = AdbManager.startSubmixRecorder(context)
-            shell = process
-            val input = process.input
+            val started = AdbManager.startSubmixRecorder(context)
+            process = started
+            shell = started
+            if (!running) return
+            val input = started.input
 
             // Look for the header line: "PCM <rate> <channels>" or "ERR <reason>".
             val header = readHeader(input)
@@ -162,10 +177,26 @@ class CaptureEngine(
             val buffer = ByteArray(1024 * LiveStreamServer.CHANNELS * 2)
             while (running) {
                 val n = input.read(buffer)
-                if (n > 0) server.offer(buffer, n) else if (n < 0) break
+                if (n > 0) server.offer(buffer, n) else if (n < 0) {
+                    if (running) {
+                        Diagnose.fail(context, Diagnose.Code.A5, "stream ended",
+                            AdbManager.helperReport(context, startedAt))
+                    }
+                    break
+                }
             }
         } catch (e: Exception) {
             if (running) Diagnose.fail(context, Diagnose.Code.A5, e.message, e.stackTraceToString())
+        } finally {
+            // Whatever ended the loop, the helper must go, or REMOTE_SUBMIX stays
+            // open and the phone silent. stop() may do the same; that is harmless.
+            if (process != null) {
+                shell = null
+                runCatching { process.close() }
+                AdbManager.stopHelper(context)
+                AdbManager.disconnect(context)
+            }
+            if (running) onEnded()
         }
     }
 

@@ -14,6 +14,7 @@ import java.util.Collections
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.abs
 
 /**
@@ -43,6 +44,8 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
         private const val BURST_SECONDS = 0.4
         private const val SILENCE_GRACE_MS = 250L
         private const val CLIENT_QUEUE = 256 // about 5 s, then data is dropped
+        private const val MAX_STREAMS = 4
+        private const val MAX_CONNECTIONS = 16
 
         fun wavHeader(): ByteArray {
             // Length fields at maximum: nobody knows how long the stream will run.
@@ -64,6 +67,14 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
     private var running = false
     private var serverSocket: ServerSocket? = null
     private val pool = Executors.newCachedThreadPool()
+    private val connections = AtomicInteger()
+
+    /**
+     * Who may fetch the stream. Anyone on the same Wi-Fi could otherwise
+     * listen in; the service limits it to the Sonos speakers.
+     */
+    @Volatile
+    var allowPeer: (String) -> Boolean = { true }
 
     private val live = ArrayBlockingQueue<ByteArray>(512)
     private var remainder = ByteArray(0)
@@ -94,7 +105,10 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
                 port = candidate
                 break
             } catch (e: IOException) {
-                if (++candidate >= preferredPort + 20) throw IOException("No free port from $preferredPort")
+                if (++candidate >= preferredPort + 20) {
+                    runCatching { socket.close() }
+                    throw IOException("No free port from $preferredPort")
+                }
             }
         }
         serverSocket = socket
@@ -217,9 +231,22 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
             } catch (e: IOException) {
                 if (running) continue else break
             }
+            // Bounded, so a flood of connections cannot exhaust threads and memory.
+            if (connections.incrementAndGet() > MAX_CONNECTIONS) {
+                connections.decrementAndGet()
+                runCatching { client.close() }
+                continue
+            }
             try {
-                pool.execute { handle(client) }
+                pool.execute {
+                    try {
+                        handle(client)
+                    } finally {
+                        connections.decrementAndGet()
+                    }
+                }
             } catch (e: Exception) {
+                connections.decrementAndGet()
                 runCatching { client.close() }
             }
         }
@@ -246,6 +273,14 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
 
             when (path) {
                 PATH -> {
+                    if (!allowPeer(peer)) {
+                        head(out, 403, "text/plain", 0)
+                        return
+                    }
+                    if (clients.size >= MAX_STREAMS) {
+                        head(out, 503, "text/plain", 0)
+                        return
+                    }
                     head(out, 200, "audio/wav", null)
                     if (method == "HEAD") return
                     stream(socket, out, peer)
@@ -296,7 +331,9 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
     private fun head(out: OutputStream, code: Int, type: String, length: Long?) {
         val reason = when (code) {
             200 -> "OK"
+            403 -> "Forbidden"
             404 -> "Not Found"
+            503 -> "Service Unavailable"
             else -> "OK"
         }
         val sb = StringBuilder()

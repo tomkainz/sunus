@@ -10,6 +10,7 @@
     <string name="mode_standard">Standard</string>
     <string name="mode_all_apps_hint">Every app, even blocked ones · phone goes silent</string>
     <string name="mode_standard_hint">No setup · some apps block capture</string>
+    <string name="mode_all_apps_unavailable">No setup · All apps needs Android 12 or newer</string>
     <string name="status_live">Live · %1$s</string>
     <string name="status_live_silent">Live · %1$s · silent</string>
     <string name="status_searching">Searching for speakers…</string>

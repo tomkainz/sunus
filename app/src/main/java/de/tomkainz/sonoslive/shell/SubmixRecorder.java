@@ -7,6 +7,8 @@ import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Looper;
 
+import androidx.annotation.RequiresApi;
+
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -85,6 +87,7 @@ public final class SubmixRecorder {
         System.exit(0);
     }
 
+    @RequiresApi(Build.VERSION_CODES.S)
     @SuppressLint({"MissingPermission", "WrongConstant"})
     private static AudioRecord create() {
         AudioFormat format = new AudioFormat.Builder()

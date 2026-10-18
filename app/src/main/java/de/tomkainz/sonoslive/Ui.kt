@@ -133,7 +133,11 @@ fun SonosLiveApp(
             Spacer(Modifier.height(32.dp))
             ModeToggle(mode, enabled = !running)
             Text(
-                stringResource(if (mode == CaptureMode.ALL_APPS) R.string.mode_all_apps_hint else R.string.mode_standard_hint),
+                stringResource(when {
+                    !AppState.allAppsSupported -> R.string.mode_all_apps_unavailable
+                    mode == CaptureMode.ALL_APPS -> R.string.mode_all_apps_hint
+                    else -> R.string.mode_standard_hint
+                }),
                 style = MaterialTheme.typography.labelSmall,
                 color = c.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -238,7 +242,8 @@ private fun ModeToggle(mode: CaptureMode, enabled: Boolean) {
     val c = MaterialTheme.colorScheme
     Surface(Modifier.fillMaxWidth(), shape = CircleShape, color = c.surfaceContainer) {
         Row(Modifier.padding(4.dp)) {
-            Pill(stringResource(R.string.mode_all_apps), mode == CaptureMode.ALL_APPS, enabled, Modifier.weight(1f)) {
+            Pill(stringResource(R.string.mode_all_apps), mode == CaptureMode.ALL_APPS,
+                enabled && AppState.allAppsSupported, Modifier.weight(1f)) {
                 AppState.setMode(CaptureMode.ALL_APPS)
             }
             Pill(stringResource(R.string.mode_standard), mode == CaptureMode.STANDARD, enabled, Modifier.weight(1f)) {

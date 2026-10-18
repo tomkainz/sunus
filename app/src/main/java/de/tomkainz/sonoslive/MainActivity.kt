@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
 
         AppState.discover(this)
         ensurePermissions()
+        if (!AppState.running.value) LiveService.restoreLeftoverVolume(this)
     }
 
     override fun onResume() {
@@ -77,6 +78,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        // Do not keep the ADB session (and Android's notice about it) open
+        // while nothing is streaming. Network: not on the main thread.
+        if (!AppState.running.value) {
+            val app = applicationContext
+            AppState.scope.launch { AdbManager.disconnect(app) }
+        }
+    }
+
     // ---- Start of the selected mode --------------------------------------
 
     private fun requestStart() {
@@ -87,7 +98,7 @@ class MainActivity : ComponentActivity() {
         when (AppState.mode.value) {
             CaptureMode.STANDARD -> {
                 if (!granted(Manifest.permission.RECORD_AUDIO)) {
-                    ensurePermissions()
+                    ensurePermissions(withMicrophone = true)
                     AppState.message.value = getString(R.string.msg_need_record)
                     return
                 }
@@ -115,8 +126,10 @@ class MainActivity : ComponentActivity() {
 
     // ---- Permissions ------------------------------------------------------
 
-    private fun needed(): List<String> {
-        val list = mutableListOf(Manifest.permission.RECORD_AUDIO)
+    /** The microphone permission only matters for Standard mode, so only ask then. */
+    private fun needed(withMicrophone: Boolean = AppState.mode.value == CaptureMode.STANDARD): List<String> {
+        val list = mutableListOf<String>()
+        if (withMicrophone) list += Manifest.permission.RECORD_AUDIO
         if (Build.VERSION.SDK_INT >= 33) list += Manifest.permission.POST_NOTIFICATIONS
         if (Build.VERSION.SDK_INT >= 37) list += "android.permission.ACCESS_LOCAL_NETWORK"
         return list
@@ -125,8 +138,8 @@ class MainActivity : ComponentActivity() {
     private fun granted(permission: String) =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
-    private fun ensurePermissions() {
-        val missing = needed().filterNot { granted(it) }
+    private fun ensurePermissions(withMicrophone: Boolean = AppState.mode.value == CaptureMode.STANDARD) {
+        val missing = needed(withMicrophone).filterNot { granted(it) }
         if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray())
     }
 

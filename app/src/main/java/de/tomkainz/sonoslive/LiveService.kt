@@ -36,7 +36,7 @@ class LiveService : Service() {
     private var streamUrl: String? = null
     private var sonos: Sonos? = null
 
-    private var savedMusicVolume = -1
+    private var standardMode = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -53,11 +53,20 @@ class LiveService : Service() {
             }
         }
 
-        Diagnose.beginSession()
-        val modeName = intent?.getStringExtra(EXTRA_MODE) ?: CaptureMode.ALL_APPS.name
-        val mode = runCatching { CaptureMode.valueOf(modeName) }.getOrDefault(CaptureMode.ALL_APPS)
+        // Already streaming (double tap, second consent): keep the running
+        // stream. startForeground is still due after startForegroundService.
+        if (server != null) {
+            startInForeground(standard = standardMode)
+            return START_NOT_STICKY
+        }
 
-        startInForeground(standard = mode == CaptureMode.STANDARD)
+        Diagnose.beginSession()
+        val modeName = intent?.getStringExtra(EXTRA_MODE) ?: AppState.mode.value.name
+        val mode = runCatching { CaptureMode.valueOf(modeName) }.getOrDefault(AppState.mode.value)
+        standardMode = mode == CaptureMode.STANDARD
+        restoreLeftoverVolume(this)
+
+        startInForeground(standard = standardMode)
         acquireWifiLock()
 
         val speaker = AppState.selected.value
@@ -93,7 +102,18 @@ class LiveService : Service() {
         // Clear the old message now, not after starting: capture runs in its
         // own thread and can fail before that.
         AppState.message.value = null
-        val eng = CaptureEngine(this, srv)
+        // Only the Sonos speakers may fetch the stream, not every device on the
+        // Wi-Fi. With a hand-set address (emulator port forwarding) anyone may.
+        if (AppState.streamBaseOverride.value.isBlank()) {
+            srv.allowPeer = { peer ->
+                peer == "127.0.0.1" || peer == speaker.ip || peer == coordinatorIp ||
+                    AppState.speakers.value.any { it.ip == peer }
+            }
+        }
+
+        // If capture ends by itself, end the service too instead of showing
+        // "Live" while only silence goes out. The error is already reported.
+        val eng = CaptureEngine(this, srv) { handler.post { if (engine != null) stopEverything() } }
         engine = eng
 
         when (mode) {
@@ -122,7 +142,9 @@ class LiveService : Service() {
         AppState.running.value = true
         pointSonosAtStream()
         startWatchdog()
-        return START_STICKY
+        // Not sticky: after a crash the system would restart the service without
+        // the capture consent, and it would only send silence.
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
@@ -132,14 +154,20 @@ class LiveService : Service() {
 
     // ---- Sonos ------------------------------------------------------------
 
+    @Volatile
+    private var coordinatorIp: String? = null
+
     private fun pointSonosAtStream() {
         val speaker = AppState.selected.value ?: return
         val url = streamUrl ?: return
         AppState.scope.launch {
             try {
                 // In a group, only the coordinator accepts the source.
-                val coordinatorIp = runCatching { Sonos(speaker).coordinatorIp() }.getOrDefault(speaker.ip)
-                val target = Sonos(speaker.copy(ip = coordinatorIp))
+                val ip = runCatching { Sonos(speaker).coordinatorIp() }.getOrDefault(speaker.ip)
+                coordinatorIp = ip
+                // Stop was pressed meanwhile: leave the speaker alone.
+                if (!AppState.running.value) return@launch
+                val target = Sonos(speaker.copy(ip = ip))
                 sonos = target
                 target.playStream(url)
                 AppState.refreshVolume()
@@ -166,7 +194,9 @@ class LiveService : Service() {
                             val current = target.currentUri()
                             val state = target.transportState()
                             if (current.isNotEmpty() && current != url) {
-                                // Someone switched source: end the stream.
+                                // Someone switched source: end the stream, but do not
+                                // stop the speaker, it is playing the new source now.
+                                sonos = null
                                 handler.post { stopEverything() }
                             } else if (state == "STOPPED") {
                                 target.playStream(url)
@@ -195,18 +225,15 @@ class LiveService : Service() {
 
     // ---- Phone volume -----------------------------------------------------
 
+    // The saved volume lives in the preferences, so it comes back even if the
+    // process died while the phone was muted.
     private fun muteMusicStream() {
         val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        savedMusicVolume = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+        prefs(this).edit().putInt(KEY_SAVED_VOLUME, am.getStreamVolume(AudioManager.STREAM_MUSIC)).apply()
         runCatching { am.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0) }
     }
 
-    private fun restoreMusicStream() {
-        if (savedMusicVolume < 0) return
-        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        runCatching { am.setStreamVolume(AudioManager.STREAM_MUSIC, savedMusicVolume, 0) }
-        savedMusicVolume = -1
-    }
+    private fun restoreMusicStream() = restoreLeftoverVolume(this)
 
     // ---- Teardown ---------------------------------------------------------
 
@@ -220,8 +247,10 @@ class LiveService : Service() {
         AppState.running.value = false
         AppState.status.value = getString(R.string.status_ready)
         handler.removeCallbacksAndMessages(null)
-        runCatching { sonos?.stop() }
+        // Network: not on the main thread, where it would fail silently.
+        sonos?.let { target -> AppState.scope.launch { runCatching { target.stop() } } }
         sonos = null
+        coordinatorIp = null
         engine?.stop()
         engine = null
         server?.stop()
@@ -308,6 +337,20 @@ class LiveService : Service() {
         const val EXTRA_MODE = "mode"
         const val EXTRA_RESULT_CODE = "resultCode"
         const val EXTRA_RESULT_DATA = "resultData"
+        private const val KEY_SAVED_VOLUME = "savedMusicVolume"
+
+        private fun prefs(context: Context) =
+            context.getSharedPreferences("sonoslive", Context.MODE_PRIVATE)
+
+        /** Puts back the phone's media volume if a Standard stream muted it. */
+        fun restoreLeftoverVolume(context: Context) {
+            val prefs = prefs(context)
+            val saved = prefs.getInt(KEY_SAVED_VOLUME, -1)
+            if (saved < 0) return
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            runCatching { am.setStreamVolume(AudioManager.STREAM_MUSIC, saved, 0) }
+            prefs.edit().remove(KEY_SAVED_VOLUME).apply()
+        }
 
         fun startStandard(context: Context, resultCode: Int, data: Intent) {
             val intent = Intent(context, LiveService::class.java)
