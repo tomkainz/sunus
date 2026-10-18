@@ -14,7 +14,7 @@ android {
         // AudioPlaybackCapture exists from Android 10
         minSdk = 29
         targetSdk = 37
-        versionCode = 16
+        versionCode = 17
         versionName = "1.0-beta"
     }
 
