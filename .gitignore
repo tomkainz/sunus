@@ -7,7 +7,7 @@ local.properties
 *.iml
 captures/
 
-# Signierschluessel bleibt lokal
+# The signing key stays local
 keystore/
 *.jks
 *.keystore

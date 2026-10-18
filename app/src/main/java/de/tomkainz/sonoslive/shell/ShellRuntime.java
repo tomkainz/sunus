@@ -1,3 +1,24 @@
+/*
+ * Copyright (C) 2018 Genymobile
+ * Copyright (C) 2018-2026 Romain Vimont
+ * Copyright (c) 2026 tomkainz
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Adapted from scrcpy (Workarounds.java) for Sunus.
+ * Changed: reduced to what AudioRecord needs, renamed, comments rewritten.
+ */
+
 package de.tomkainz.sonoslive.shell;
 
 import android.annotation.SuppressLint;
@@ -12,12 +33,12 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
- * Stellt fuer einen per app_process gestarteten Prozess das Minimum an
- * Android-Laufzeit her, das AudioRecord erwartet: einen ActivityThread, einen
- * System-Context und eine Application, die sich als com.android.shell ausgibt.
+ * Sets up, for a process started via app_process, the minimum of
+ * Android runtime that AudioRecord expects: an ActivityThread, a
+ * system context and an Application that poses as com.android.shell.
  *
- * Vorgehen und Reihenfolge nach scrcpy (Workarounds.java, Apache-2.0), auf den
- * Audio-Teil reduziert.
+ * Approach and order follow scrcpy (Workarounds.java, Apache-2.0), reduced to
+ * the audio part.
  */
 @SuppressLint({"PrivateApi", "BlockedPrivateApi", "SoonBlockedPrivateApi", "DiscouragedPrivateApi"})
 final class ShellRuntime {
@@ -49,8 +70,8 @@ final class ShellRuntime {
 
     static void apply() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // Muss vor dem Application-Context stehen, sonst gibt es auf manchen
-            // Samsung-Geraeten keinen gueltigen System-Context.
+            // Must come before the application context, otherwise some
+            // Samsung devices have no valid system context.
             fillConfigurationController();
         }
         if (!Build.BRAND.equalsIgnoreCase("ONYX")) {
@@ -86,7 +107,7 @@ final class ShellRuntime {
             bound.setAccessible(true);
             bound.set(ACTIVITY_THREAD, bindData);
         } catch (Throwable ignored) {
-            // nur ein Workaround; ohne ihn geht es auf den meisten Geraeten auch
+            // only a workaround; most devices work without it too
         }
     }
 

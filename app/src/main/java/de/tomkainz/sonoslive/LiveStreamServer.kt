@@ -17,18 +17,18 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
 /**
- * Der Live-Stream, den sich der Sonos abholt: endloses WAV (16 Bit PCM) unter
- * /live.wav, ohne Content-Length, Verbindung endet erst beim Trennen.
+ * The live stream the Sonos pulls: endless WAV (16-bit PCM) at /live.wav,
+ * without Content-Length; the connection only ends when the client disconnects.
  *
- * Aufbau wie sonos-stream.py der Linux-Bridge, weil sich das am Sonos bewaehrt
- * hat:
- * - Fan-out an beliebig viele Clients. Der Sonos oeffnet die URL oft zweimal
- *   (Probe, dann Wiedergabe) - beide bekommen denselben Strom.
- * - Jeder neue Client bekommt zuerst die letzten [BURST_SECONDS] als Polster.
- * - Kommt laenger als [SILENCE_GRACE_MS] kein Ton, wird Stille im Echtzeittakt
- *   nachgeschoben. So bleibt der Sonos verbunden, auch wenn gerade nichts spielt.
- * - Ein Client, der nicht hinterherkommt, verliert alte Daten, statt die
- *   Aufnahme aufzuhalten.
+ * Built like sonos-stream.py from the Linux bridge, because that design has
+ * proven itself with Sonos:
+ * - Fan-out to any number of clients. The Sonos often opens the URL twice
+ *   (probe, then playback), and both get the same stream.
+ * - Every new client first gets the last [BURST_SECONDS] as a buffer.
+ * - If no audio arrives for longer than [SILENCE_GRACE_MS], silence is fed in
+ *   at real-time pace. That keeps the Sonos connected even when nothing plays.
+ * - A client that cannot keep up loses old data instead of holding up the
+ *   capture.
  */
 class LiveStreamServer(private val preferredPort: Int = 8090) {
 
@@ -42,10 +42,10 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
         private const val TICK_BYTES = (BYTES_PER_SEC * TICK_MS / 1000).toInt()
         private const val BURST_SECONDS = 0.4
         private const val SILENCE_GRACE_MS = 250L
-        private const val CLIENT_QUEUE = 256 // ca. 5 s, dann wird verworfen
+        private const val CLIENT_QUEUE = 256 // about 5 s, then data is dropped
 
         fun wavHeader(): ByteArray {
-            // Laengenfelder auf Maximum: wie lange gestreamt wird, weiss niemand.
+            // Length fields at maximum: nobody knows how long the stream will run.
             val b = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
             b.put("RIFF".toByteArray()).putInt(-1)
             b.put("WAVEfmt ".toByteArray()).putInt(16)
@@ -116,9 +116,9 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
     }
 
     /**
-     * Neue Aufnahmedaten. Darf aus beliebig grossen Stuecken bestehen - der
-     * Rest, der keinen ganzen Frame (4 Bytes) ergibt, wird zurueckgehalten,
-     * sonst liefe das Stereobild auseinander.
+     * New capture data. It may come in chunks of any size; the remainder that
+     * does not make up a whole frame (4 bytes) is held back, otherwise the
+     * stereo channels would drift apart.
      */
     fun offer(data: ByteArray, length: Int = data.size) {
         if (!running || length <= 0) return
@@ -133,7 +133,7 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
         }
     }
 
-    // ---- Takt -------------------------------------------------------------
+    // ---- Clock ------------------------------------------------------------
 
     private fun pumpLoop() {
         val silence = ByteArray(TICK_BYTES)
@@ -178,7 +178,7 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
     private fun peakOf(data: ByteArray): Int {
         var max = 0
         var i = 0
-        // jede 8. Probe reicht fuer eine Pegelanzeige
+        // every 8th sample is enough for a level meter
         while (i + 1 < data.size) {
             val v = abs(((data[i + 1].toInt() shl 8) or (data[i].toInt() and 0xFF)).toShort().toInt())
             if (v > max) max = v
@@ -189,8 +189,8 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
 
     private fun broadcast(data: ByteArray) {
         val targets: List<Client>
-        // Polster und Client-Liste unter derselben Sperre: ein neuer Client
-        // bekommt jedes Stueck genau einmal, entweder im Polster oder live.
+        // Buffer and client list under the same lock: a new client gets every
+        // chunk exactly once, either in the buffer or live.
         synchronized(history) {
             history.addLast(data)
             historyBytes += data.size
@@ -260,7 +260,7 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
             }
             out.flush()
         } catch (e: Exception) {
-            // Abbrueche sind normal: der Sonos trennt bei Stop oder Quellenwechsel.
+            // Aborts are normal: the Sonos disconnects on stop or source change.
         } finally {
             runCatching { socket.close() }
         }
@@ -276,7 +276,7 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
         AppState.clients.value = clients.size
         AppState.lastClient.value = peer
         try {
-            // Jeder Client steigt mitten im Strom ein und braucht einen eigenen Kopf.
+            // Every client joins mid-stream and needs its own header.
             out.write(wavHeader())
             for (chunk in burst) {
                 out.write(chunk)

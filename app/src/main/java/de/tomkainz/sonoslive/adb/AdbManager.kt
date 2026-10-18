@@ -19,37 +19,37 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Die eingebaute ADB-Verbindung der App zu sich selbst.
+ * The app's built-in ADB connection to itself.
  *
- * Android erlaubt normalen Apps kein REMOTE_SUBMIX. Die ADB-Shell (uid 2000)
- * darf es. Deshalb koppelt sich die App einmalig ueber "Kabelloses Debugging"
- * mit dem eigenen Handy und startet darueber den Aufnahme-Helfer mit
- * Shell-Rechten. Es wird nichts an ein anderes Geraet gesendet, die Verbindung
- * laeuft ausschliesslich lokal zum eigenen ADB-Dienst.
+ * Android does not allow normal apps to use REMOTE_SUBMIX. The ADB shell (uid 2000)
+ * may. So the app pairs once with its own phone via "Wireless debugging"
+ * and uses that to start the capture helper with
+ * shell permissions. Nothing is sent to another device, the connection
+ * runs only locally to the phone's own ADB service.
  */
 object AdbManager {
 
-    /** Ablage fuer die Fehlerausgabe des Helfers; fuer Shell les- und schreibbar. */
+    /** Where the helper's error output goes; readable and writable for the shell. */
     private const val ERROR_FILE = "/data/local/tmp/sonoslive-helper.err"
 
     private const val WRITE_SECURE_SETTINGS = "android.permission.WRITE_SECURE_SETTINGS"
     private const val OP_PROJECT_MEDIA = "android:project_media"
 
-    // Nicht oeffentlich in Settings.Global, aber seit Android 11 unveraendert.
+    // Not public in Settings.Global, but unchanged since Android 11.
     private const val ADB_WIFI_ENABLED = "adb_wifi_enabled"
     private const val ADB_ALLOWED_TIME = "adb_allowed_connection_time"
 
-    /** Port des ADB-Dienstes vom letzten Mal; er gilt, bis der Dienst neu startet. */
+    /** Port of the ADB service from last time; valid until the service restarts. */
     private const val PREFS = "adb"
     private const val KEY_PORT = "port"
 
-    /** Ohne Grenze wartet die Bibliothek unbegrenzt auf die Antwort von adbd. */
+    /** Without a limit the library waits forever for the answer from adbd. */
     private const val ANSWER_TIMEOUT_MS = 6000L
 
     /**
-     * Koppeln mit dem Code aus dem Dialog "Geraet mit Kopplungscode koppeln".
-     * [host] kommt aus der mDNS-Suche; fehlt er, wird die eigene WLAN-Adresse
-     * genommen. Der Kopplungsdienst lauscht auf allen Schnittstellen.
+     * Pairs using the code from the "Pair device with pairing code" dialog.
+     * [host] comes from the mDNS search; if it is missing, the phone's own Wi-Fi
+     * address is used. The pairing service listens on all interfaces.
      */
     fun pair(context: Context, host: String?, port: Int, code: String): Boolean {
         val manager = AdbKeyManager.getInstance(context)
@@ -59,7 +59,7 @@ object AdbManager {
             try {
                 if (manager.pair(candidate, port, code)) return true
             } catch (e: java.io.IOException) {
-                // Verbindungsfehler: naechste Adresse probieren
+                // Connection error: try the next address
                 lastError = e
             }
         }
@@ -68,16 +68,16 @@ object AdbManager {
     }
 
     /**
-     * Verbindet sich mit dem lokalen ADB-Dienst. Zuerst ueber den Port vom
-     * letzten Mal: er gilt, bis "Kabelloses Debugging" neu startet (Neustart,
-     * WLAN-Wechsel), und ein veralteter wird sofort abgelehnt. Erst dann die
-     * mDNS-Suche, die mehrere Sekunden dauern kann. Ist "Kabelloses Debugging"
-     * aus, schaltet die App es selbst ein, sofern sie sich [grantSelf] schon
-     * erteilt hat.
+     * Connects to the local ADB service. First via the port from
+     * last time: it stays valid until "Wireless debugging" restarts (reboot,
+     * Wi-Fi change), and a stale one is rejected right away. Only then the
+     * mDNS search, which can take several seconds. If "Wireless debugging"
+     * is off, the app turns it on itself, provided it has already run
+     * [grantSelf].
      *
-     * false: das Handy kennt die App nicht (mehr), sie muss neu koppeln.
-     * Wirft [IOException], wenn kein ADB-Dienst zu finden ist.
-     * Netzwerk: nicht auf dem Haupt-Thread aufrufen.
+     * false: the phone does not know the app (any more), it has to pair again.
+     * Throws [IOException] if no ADB service can be found.
+     * Network: do not call on the main thread.
      */
     @Synchronized
     fun connect(context: Context, timeoutMs: Long = 8000): Boolean {
@@ -95,15 +95,15 @@ object AdbManager {
             } catch (e: AdbPairingRequiredException) {
                 return false
             } catch (e: Exception) {
-                false // Port veraltet
+                false // stale port
             }
             if (ok) {
-                AppState.log("ADB verbunden in ${SystemClock.elapsedRealtime() - started} ms (bekannter Port)")
+                AppState.log("ADB connected in ${SystemClock.elapsedRealtime() - started} ms (known port)")
                 return true
             }
         }
 
-        // Frisch eingeschaltet braucht der Dienst ein paar Sekunden bis zur mDNS-Ankuendigung.
+        // Freshly turned on, the service needs a few seconds before its mDNS announcement.
         val (host, port) = findPort(context, if (switchedOn) timeoutMs + 7000 else timeoutMs)
             ?: throw IOException(context.getString(R.string.adb_not_found))
         val ok = try {
@@ -113,15 +113,15 @@ object AdbManager {
         }
         if (ok) {
             prefs.edit().putInt(KEY_PORT, port).apply()
-            AppState.log("ADB verbunden in ${SystemClock.elapsedRealtime() - started} ms (Port gesucht)")
+            AppState.log("ADB connected in ${SystemClock.elapsedRealtime() - started} ms (port searched)")
         }
         return ok
     }
 
     /**
-     * Sucht den ADB-Dienst per mDNS: kabelloses Debugging (TLS) oder, wie im
-     * Emulator, klassisch ueber TCP. Wie autoConnect der Bibliothek, liefert
-     * aber den Port, damit er fuers naechste Mal bleibt.
+     * Looks for the ADB service via mDNS: wireless debugging (TLS) or, as in
+     * the emulator, classic TCP. Like the library's autoConnect, but returns
+     * the port so it can be kept for next time.
      */
     private fun findPort(context: Context, timeoutMs: Long): Pair<String?, Int>? {
         val found = AtomicReference<Pair<String?, Int>?>()
@@ -140,14 +140,14 @@ object AdbManager {
     }
 
     /**
-     * Was die App nur einmal ueber die Shell braucht, danach nicht mehr:
-     *  - WRITE_SECURE_SETTINGS, um "Kabelloses Debugging" selbst einzuschalten
-     *    (so startet auch Shizuku ab 13.6 ohne Root),
-     *  - die Freigabe PROJECT_MEDIA: der Standard-Modus startet dann ohne
-     *    Zustimmungsdialog und wird beim Sperren des Bildschirms nicht beendet,
-     *  - adb_allowed_connection_time 0: die Kopplung verfaellt nicht, wenn
-     *    eine Woche lang nicht gestreamt wurde.
-     * Fehlt nichts, passiert nichts.
+     * What the app needs from the shell only once, and never again after that:
+     *  - WRITE_SECURE_SETTINGS, to turn on "Wireless debugging" itself
+     *    (this is also how Shizuku starts without root since 13.6),
+     *  - the PROJECT_MEDIA permission: standard mode then starts without
+     *    a consent dialog and is not stopped when the screen locks,
+     *  - adb_allowed_connection_time 0: the pairing does not expire when
+     *    nothing was streamed for a week.
+     * If nothing is missing, nothing happens.
      */
     fun grantSelf(context: Context) {
         val pkg = context.packageName
@@ -166,10 +166,10 @@ object AdbManager {
             process.input.bufferedReader().use { it.readText() }
             process.close()
         }
-        AppState.log("Rechte eingerichtet: ${commands.size} Schritt(e)")
+        AppState.log("Permissions set up: ${commands.size} step(s)")
     }
 
-    /** Kurzer Zustand fuer Fehlerberichte. */
+    /** Short status for error reports. */
     fun status(context: Context): String {
         val wifi = runCatching {
             Settings.Global.getInt(context.contentResolver, ADB_WIFI_ENABLED, 0) == 1
@@ -190,9 +190,9 @@ object AdbManager {
     }
 
     /**
-     * Schaltet "Kabelloses Debugging" ein. Liefert true nur, wenn es vorher aus
-     * war. Ist das WLAN noch nicht als vertrauenswuerdig gespeichert, fragt
-     * Android einmal nach ("In diesem Netzwerk immer zulassen").
+     * Turns on "Wireless debugging". Returns true only if it was off
+     * before. If the Wi-Fi network is not yet saved as trusted, Android
+     * asks once ("Always allow on this network").
      */
     private fun enableWirelessDebugging(context: Context): Boolean {
         if (!canWriteSecureSettings(context)) return false
@@ -201,7 +201,7 @@ object AdbManager {
             if (Settings.Global.getInt(resolver, ADB_WIFI_ENABLED, 0) == 1) {
                 false
             } else {
-                // USB-Debugging (adb_enabled) bleibt, wie es ist; noetig ist nur das kabellose.
+                // USB debugging (adb_enabled) stays as it is; only the wireless one is needed.
                 Settings.Global.putInt(resolver, ADB_WIFI_ENABLED, 1)
             }
         }.getOrDefault(false)
@@ -215,8 +215,8 @@ object AdbManager {
     }
 
     /**
-     * Fuehrt einen Shell-Befehl aus und liefert dessen laufenden Datenstrom.
-     * Schliessen des Streams beendet den Befehl.
+     * Runs a shell command and returns its running data stream.
+     * Closing the stream ends the command.
      */
     fun openShell(context: Context, command: String): ShellProcess {
         val manager = AdbKeyManager.getInstance(context)
@@ -225,10 +225,10 @@ object AdbManager {
     }
 
     /**
-     * Startet [SubmixRecorder] mit Shell-Rechten. stderr und danach der
-     * Exit-Code gehen in eine Datei, damit ein Fehlstart ueber [helperReport]
-     * nachvollziehbar ist; stdout bleibt reines PCM. Beendet wird er ueber
-     * [stopHelper]: Schliessen der Verbindung allein reicht nicht.
+     * Starts [SubmixRecorder] with shell permissions. stderr and then the
+     * exit code go to a file, so a failed start can be traced via
+     * [helperReport]; stdout stays pure PCM. It is stopped via
+     * [stopHelper]: closing the connection alone is not enough.
      */
     fun startSubmixRecorder(context: Context): ShellProcess {
         val apk = context.applicationInfo.sourceDir
@@ -240,15 +240,15 @@ object AdbManager {
     }
 
     /**
-     * Beendet laufende Helfer. Die Shell laeuft in einem Pseudo-Terminal, und
-     * adbd beendet sie beim Schliessen des Streams nicht (im Emulator nach dem
-     * Stopp ueber eine Minute weitergelaufen). Ein uebrig gebliebener Helfer
-     * haelt REMOTE_SUBMIX offen, das Handy bliebe stumm. Das Muster
-     * "SubmixRecorde[r]" trifft die Befehlszeile dieser Shell selbst nicht.
-     * pgrep statt einer Schleife ueber /proc mit grep: die brauchte im
-     * Emulator 12 s, pgrep 0,15 s. Nicht "pkill -9 -f": das beendete dort die
-     * aufrufende Shell gleich mit.
-     * Netzwerk: nicht auf dem Haupt-Thread aufrufen.
+     * Stops running helpers. The shell runs in a pseudo-terminal, and
+     * adbd does not end it when the stream is closed (in the emulator it kept
+     * running for over a minute after the stop). A leftover helper
+     * keeps REMOTE_SUBMIX open, and the phone would stay silent. The pattern
+     * "SubmixRecorde[r]" does not match the command line of this shell itself.
+     * pgrep instead of a loop over /proc with grep: that took 12 s in the
+     * emulator, pgrep 0.15 s. Not "pkill -9 -f": there it also killed the
+     * calling shell.
+     * Network: do not call on the main thread.
      */
     fun stopHelper(context: Context) {
         val command = "X='SubmixRecorde[r]'; P=\$(pgrep -f \"\$X\") && kill \$P && sleep 1 && " +
@@ -261,12 +261,12 @@ object AdbManager {
     }
 
     /**
-     * Alles zum Fehlstart des Helfers: seine Fehlerausgabe mit Exit-Code und
-     * die Log-Zeilen seit [sinceMillis]. Startfehler von app_process (fehlende
-     * Klasse, Abbruch der VM) stehen nur im Log, nicht auf stderr.
+     * Everything about a failed helper start: its error output with exit code
+     * and the log lines since [sinceMillis]. Start errors from app_process
+     * (missing class, VM abort) only show up in the log, not on stderr.
      */
     fun helperReport(context: Context, sinceMillis: Long): String = runCatching {
-        // Kurz warten: der Exit-Code wird erst nach dem Ende des Helfers geschrieben.
+        // Wait briefly: the exit code is only written after the helper has ended.
         Thread.sleep(500)
         val since = String.format(java.util.Locale.ROOT, "%d.%03d", sinceMillis / 1000, sinceMillis % 1000)
         val command = "echo '== Helper (stderr, exit code) =='; cat $ERROR_FILE 2>/dev/null; " +
@@ -280,8 +280,8 @@ object AdbManager {
     }.getOrElse { "Report not readable: $it" }
 
     private fun hostIp(context: Context): String {
-        // Self-Pairing: der ADB-Dienst lauscht auf allen Schnittstellen des
-        // Geraets, die eigene WLAN-Adresse ist also erreichbar.
+        // Self-pairing: the ADB service listens on all interfaces of the
+        // device, so the phone's own Wi-Fi address is reachable.
         return de.tomkainz.sonoslive.Net.localIp(context) ?: "127.0.0.1"
     }
 

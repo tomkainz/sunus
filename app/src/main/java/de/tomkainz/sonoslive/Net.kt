@@ -9,12 +9,12 @@ import java.net.Inet4Address
 object Net {
 
     /**
-     * Die WLAN-Adresse dieses Handys. Genau die muss in der Stream-URL stehen,
-     * die wir dem Sonos nennen.
+     * The Wi-Fi address of this phone. Exactly this one has to be in the stream URL
+     * that we give the Sonos.
      *
-     * Bewusst NICHT ueber activeNetwork: sobald Mobilfunk die Standardroute
-     * stellt, liefert das die (fuer den Sonos unerreichbare) Mobilfunkadresse.
-     * Darum gezielt die WLAN- bzw. Ethernet-Schnittstelle.
+     * Deliberately NOT via activeNetwork: as soon as mobile data provides the default
+     * route, that returns the mobile address (unreachable for the Sonos).
+     * So we pick the Wi-Fi or Ethernet interface specifically.
      */
     fun localIp(context: Context): String? {
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return null

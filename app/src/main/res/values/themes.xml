@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Compose uebernimmt das Styling; das Android-Theme haelt nur den
-         Startbildschirm ruhig und blendet die Titelleiste aus. -->
+    <!-- Compose does the styling; the Android theme only keeps the launch
+         screen calm and hides the title bar. -->
     <style name="Theme.SonosLive" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">#0B0B0D</item>
         <item name="android:statusBarColor">#0B0B0D</item>
@@ -9,8 +9,8 @@
         <item name="android:windowLightStatusBar">false</item>
     </style>
 
-    <!-- Nur bis die App steht: schwarz mit Logo. MainActivity wechselt in
-         onCreate auf Theme.SonosLive. -->
+    <!-- Only until the app is up: black with the logo. MainActivity switches
+         to Theme.SonosLive in onCreate. -->
     <style name="Theme.SonosLive.Start">
         <item name="android:windowBackground">@drawable/splash_window</item>
         <item name="android:statusBarColor">#000000</item>

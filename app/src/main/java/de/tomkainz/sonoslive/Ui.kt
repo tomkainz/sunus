@@ -89,6 +89,7 @@ fun SonosLiveApp(
 
     val c = MaterialTheme.colorScheme
     var showMore by remember { mutableStateOf(false) }
+    var showLicenses by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(c.background)) {
         Column(
@@ -99,8 +100,8 @@ fun SonosLiveApp(
                 .padding(horizontal = 20.dp)
                 .padding(top = 12.dp, bottom = 200.dp)
         ) {
-            // App-Symbol als Kachel: der dunkle Grund haelt die helle Linie
-            // des Logos auch im hellen Design sichtbar.
+            // App icon as a tile: the dark background keeps the logo's light
+            // line visible in the light theme too.
             Box(
                 Modifier
                     .padding(top = 20.dp)
@@ -169,8 +170,11 @@ fun SonosLiveApp(
 
         message?.let { Snackbar(it, Modifier.align(Alignment.BottomCenter).padding(bottom = 150.dp)) }
 
-        if (showMore) MoreSheet(mode, running, onAddManual) { showMore = false }
+        if (showMore) MoreSheet(mode, running, onAddManual, onLicenses = { showMore = false; showLicenses = true }) {
+            showMore = false
+        }
         if (requestPairing) PairingDialog(onStartPairing)
+        if (showLicenses) LicensesScreen { showLicenses = false }
     }
 }
 
@@ -178,7 +182,7 @@ fun SonosLiveApp(
 private fun statusText(
     running: Boolean, status: String, audioFlowing: Boolean, selected: Speaker?, searching: Boolean
 ): String = when {
-    // Die Live-Status beginnen in jeder Sprache mit "Live".
+    // The live statuses start with "Live" in every language.
     running && status.startsWith("Live") -> stringResource(
         if (audioFlowing) R.string.status_live else R.string.status_live_silent, selected?.room ?: ""
     )
@@ -188,7 +192,7 @@ private fun statusText(
     else -> stringResource(R.string.status_ready)
 }
 
-// ---- Lautsprecher -------------------------------------------------------
+// ---- Speakers -----------------------------------------------------------
 
 @Composable
 private fun SpeakerRow(sp: Speaker, selected: Boolean, onClick: () -> Unit) {
@@ -227,7 +231,7 @@ private fun EmptySpeaker(searching: Boolean, onDiscover: () -> Unit) {
     }
 }
 
-// ---- Betriebsart als schlanker Umschalter -------------------------------
+// ---- Mode as a slim toggle ----------------------------------------------
 
 @Composable
 private fun ModeToggle(mode: CaptureMode, enabled: Boolean) {
@@ -263,7 +267,7 @@ private fun Pill(text: String, selected: Boolean, enabled: Boolean, modifier: Mo
     }
 }
 
-// ---- Lautstaerke --------------------------------------------------------
+// ---- Volume -------------------------------------------------------------
 
 @Composable
 private fun VolumeLine(volume: Int, onSetVolume: (Int) -> Unit) {
@@ -282,7 +286,7 @@ private fun VolumeLine(volume: Int, onSetVolume: (Int) -> Unit) {
     }
 }
 
-// ---- Power-Taste mit Pegel-Ring ----------------------------------------
+// ---- Power button with level ring --------------------------------------
 
 @Composable
 private fun PowerButton(
@@ -304,7 +308,7 @@ private fun PowerButton(
         else -> c.onSurfaceVariant.copy(alpha = 0.5f)
     }
     Box(Modifier.size(104.dp), contentAlignment = Alignment.Center) {
-        // Leuchtring: waechst mit dem Pegel, nur wenn wirklich Ton fliesst.
+        // Glow ring: grows with the level, only when audio is really flowing.
         Canvas(Modifier.fillMaxSize()) {
             if (running) {
                 val base = 34.dp.toPx()
@@ -327,7 +331,7 @@ private fun IconSpot(onClick: () -> Unit, content: @Composable () -> Unit) {
     Box(Modifier.size(48.dp).clickable(onClick = onClick), contentAlignment = Alignment.Center) { content() }
 }
 
-/** Meldung; Tippen schliesst sie. Bei Fehlern mit Code gibt es den Bericht dazu. */
+/** Message; tapping dismisses it. Errors with a code come with the report. */
 @Composable
 private fun Snackbar(text: String, modifier: Modifier) {
     val c = MaterialTheme.colorScheme
@@ -349,10 +353,12 @@ private fun Snackbar(text: String, modifier: Modifier) {
     }
 }
 
-// ---- "Mehr": IP von Hand, Handy stumm, Hinweise ------------------------
+// ---- "More": manual IP, mute phone, hints, licenses -------------------
 
 @Composable
-private fun MoreSheet(mode: CaptureMode, running: Boolean, onAddManual: (String) -> Unit, onClose: () -> Unit) {
+private fun MoreSheet(
+    mode: CaptureMode, running: Boolean, onAddManual: (String) -> Unit, onLicenses: () -> Unit, onClose: () -> Unit
+) {
     val c = MaterialTheme.colorScheme
     val muteLocal by AppState.muteLocal.collectAsStateWithLifecycle()
     val report by AppState.report.collectAsStateWithLifecycle()
@@ -422,7 +428,12 @@ private fun MoreSheet(mode: CaptureMode, running: Boolean, onAddManual: (String)
                     }
                 }
 
-                TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.close)) }
+                HorizontalDivider(color = c.outlineVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onLicenses) { Text(stringResource(R.string.licenses)) }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = onClose) { Text(stringResource(R.string.close)) }
+                }
             }
         }
     }
@@ -433,7 +444,7 @@ private fun Hint(text: String) {
     Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-// ---- Kopplung (Alle-Apps-Modus) -----------------------------------------
+// ---- Pairing (All apps mode) --------------------------------------------
 
 @Composable
 private fun PairingDialog(onStartPairing: (Int?) -> Unit) {
@@ -470,7 +481,7 @@ private fun PairingDialog(onStartPairing: (Int?) -> Unit) {
 
                 adbMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = c.primary) }
 
-                // Eigene Zeile: zu dritt in einer Zeile brach "Kopplung starten" mehrfach um.
+                // Own row: with three buttons in one row, "Start pairing" wrapped several times.
                 TextButton(onClick = { manual = !manual }) {
                     Text(stringResource(if (manual) R.string.pair_port_auto else R.string.pair_port_manual),
                         style = MaterialTheme.typography.labelSmall)
@@ -493,7 +504,7 @@ private fun PairingDialog(onStartPairing: (Int?) -> Unit) {
     }
 }
 
-// ---- Selbst gezeichnete Icons ------------------------------------------
+// ---- Hand-drawn icons --------------------------------------------------
 
 @Composable
 private fun CheckGlyph() {
@@ -566,7 +577,7 @@ private fun StopGlyph(color: Color) {
     }
 }
 
-/** Lupe (Suchen). */
+/** Magnifying glass (search). */
 @Composable
 private fun SearchGlyph() {
     val c = MaterialTheme.colorScheme
@@ -581,7 +592,7 @@ private fun SearchGlyph() {
     }
 }
 
-/** Drei Punkte (Mehr). */
+/** Three dots (more). */
 @Composable
 private fun MoreGlyph() {
     val c = MaterialTheme.colorScheme

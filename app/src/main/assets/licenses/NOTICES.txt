@@ -1,0 +1,165 @@
+Sunus
+Copyright (c) 2026 tomkainz
+Licensed under the MIT License (see LICENSE.txt).
+Source code: https://github.com/tomkainz/sunus
+
+Sunus contains the following third-party software. The full license
+texts are included in this app.
+
+
+libadb-android 3.1.1
+https://github.com/MuntashirAkon/libadb-android
+Copyright 2021 Muntashir Al-Islam
+Dual licensed under GPL-3.0-or-later or Apache-2.0; used here under the
+Apache License 2.0.
+Parts of it carry additional notices:
+- AdbConnection, AdbProtocol, AdbStream: Copyright (c) 2013, Cameron
+  Gutman; AdbAuthenticationFailedException: Copyright 2020 Sam Palmer.
+  BSD 3-Clause License (text below).
+- PRNGFixes: Copyright 2013 Google Inc. MIT License (text below).
+- AdbMdns: Copyright 2020 南宫雪珊.
+Sunus' adb/AdbKeyManager.java follows the example app of libadb-android.
+
+
+spake2-android 2.2.1 (SPAKE2-Java, pulled in by libadb-android)
+https://github.com/MuntashirAkon/spake2-java
+https://github.com/MuntashirAkon/spake2-c
+Copyright 2021 Muntashir Al-Islam
+Licensed under the GNU Lesser General Public License v3.0 (see
+LGPL-3.0.txt and GPL-3.0.txt). The library is used unmodified. Its source
+code is available at the addresses above; you may replace it with a
+modified version by building Sunus from source.
+The native part (libspake2.so) contains:
+- spake2.c, ed25519.h: Copyright (c) 2020, Google Inc.;
+  Copyright (c) 2021, Muntashir Al-Islam. ISC License (text below).
+- curve25519_32.h: Copyright (c) 2015-2020 the fiat-crypto authors.
+  MIT License (text below).
+- sha512.c, sha512.h: Copyright (C) 2007-2015 Free Software Foundation,
+  Inc.; Copyright (C) 2021 Muntashir Al-Islam. GNU Lesser General Public
+  License v2.1 or later (see LGPL-2.1.txt).
+- spake2.h: Copyright 2022 Muntashir Al-Islam. Apache License 2.0.
+The Ed25519 code is based on EdDSA-Java (CC0 1.0).
+
+
+sun-security-android 1.1
+https://github.com/MuntashirAkon/sun-security-android
+Based on sun.security from OpenJDK. Copyright (c) Oracle and/or its
+affiliates.
+Licensed under the GNU General Public License v2.0 with the "Classpath"
+exception (see GPL-2.0.txt). The library is used unmodified; its source
+code is available at the address above.
+
+
+Bouncy Castle (bcprov-jdk15to18) 1.81
+https://www.bouncycastle.org
+Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc.
+(https://www.bouncycastle.org). MIT License (text below).
+
+
+AndroidHiddenApiBypass 6.2
+https://github.com/LSPosed/AndroidHiddenApiBypass
+Copyright LSPosed. Apache License 2.0.
+
+
+scrcpy
+https://github.com/Genymobile/scrcpy
+Copyright (C) 2018 Genymobile
+Copyright (C) 2018-2026 Romain Vimont
+Apache License 2.0. Sunus' shell/ShellRuntime.java and
+shell/ShellContext.java are adapted from scrcpy's Workarounds.java and
+FakeContext.java, reduced to audio capture.
+
+
+Android Jetpack (AndroidX, Jetpack Compose, Material 3)
+https://developer.android.com/jetpack
+Copyright The Android Open Source Project. Apache License 2.0.
+
+
+Kotlin standard library, kotlinx.coroutines, kotlinx.serialization,
+JetBrains Java Annotations
+https://kotlinlang.org
+Copyright JetBrains s.r.o. and Kotlin Programming Language contributors.
+Apache License 2.0.
+
+
+Guava ListenableFuture
+https://github.com/google/guava
+Copyright The Guava Authors. Apache License 2.0.
+
+
+JSpecify
+https://jspecify.dev
+Copyright The JSpecify Authors. Apache License 2.0.
+
+
+----------------------------------------------------------------------
+BSD 3-Clause License
+
+Copyright (c) 2013, Cameron Gutman
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+  Redistributions of source code must retain the above copyright notice,
+  this list of conditions and the following disclaimer.
+
+  Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+
+  Neither the name of the copyright holder nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+----------------------------------------------------------------------
+MIT License (libadb-android PRNGFixes, fiat-crypto, Bouncy Castle)
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+----------------------------------------------------------------------
+ISC License (spake2-c)
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.

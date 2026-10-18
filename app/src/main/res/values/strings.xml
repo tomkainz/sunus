@@ -5,7 +5,7 @@
     <string name="channel_live_desc">Shows that audio is currently going to the speaker</string>
     <string name="channel_pairing">Setup</string>
 
-    <!-- Hauptansicht -->
+    <!-- Main screen -->
     <string name="mode_all_apps">All apps</string>
     <string name="mode_standard">Standard</string>
     <string name="mode_all_apps_hint">Every app, even blocked ones · phone goes silent</string>
@@ -23,7 +23,7 @@
     <string name="empty_none">No Sonos found</string>
     <string name="empty_hint">Tap to search · IP under ⋯</string>
 
-    <!-- Meldungen -->
+    <!-- Messages -->
     <string name="report_share">Share report</string>
     <string name="report_save">Save</string>
     <string name="msg_no_consent">Without consent, Standard mode can\'t record.</string>
@@ -34,7 +34,7 @@
     <string name="msg_no_sonos_at">No Sonos answers at %1$s.</string>
     <string name="msg_volume_error">Volume: %1$s</string>
 
-    <!-- Mehr -->
+    <!-- More -->
     <string name="more_ip">Speaker by IP</string>
     <string name="ok">OK</string>
     <string name="more_mute">Mute phone</string>
@@ -46,9 +46,13 @@
     <string name="share">Share</string>
     <string name="save_downloads">Save to Downloads</string>
     <string name="close">Close</string>
+    <string name="licenses">Open-source licenses</string>
+    <string name="licenses_intro">Sunus is open source under the MIT License and uses the components listed under \"Notices\".</string>
+    <string name="licenses_notices">Notices and copyrights</string>
+    <string name="licenses_app">Sunus license (MIT)</string>
     <string name="cancel">Cancel</string>
 
-    <!-- Kopplung -->
+    <!-- Pairing -->
     <string name="pair_title">Set up All apps</string>
     <string name="pair_steps">1. Tap \"Start pairing\". \"Wireless debugging\" opens.\n2. Turn it on and tap \"Pair device with pairing code\".\n3. Leave the dialog open, pull down the notification shade and enter the 6-digit code in \"Pair Sunus\".</string>
     <string name="pair_hint">The app finds the port itself. If Developer options are still hidden: Settings &gt; About phone &gt; tap \"Build number\" 7 times.</string>
@@ -80,11 +84,11 @@
     <string name="pair_enter_code">Enter code</string>
     <string name="adb_not_found">Wireless debugging not found. Is it on and is Wi-Fi connected?</string>
 
-    <!-- Stream-Benachrichtigung -->
+    <!-- Stream notification -->
     <string name="notif_live_text">Phone audio is playing on the Sonos</string>
     <string name="notif_stop">Stop</string>
 
-    <!-- Fehlercodes und Bericht -->
+    <!-- Error codes and report -->
     <string name="error_format">%1$s (error %2$s)</string>
     <string name="code_a1">ADB connection failed. Is \"Wireless debugging\" on?</string>
     <string name="code_a2">The capture helper did not start.</string>

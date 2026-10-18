@@ -23,9 +23,9 @@ data class Speaker(
 )
 
 /**
- * Sonos-Geraetesuche per SSDP: M-SEARCH an 239.255.255.250:1900, Antworten
- * einsammeln, Beschreibung jedes Geraets holen. Ab Android 17 faellt das unter
- * ACCESS_LOCAL_NETWORK; ohne die Berechtigung liefert der Socket EPERM.
+ * Sonos device discovery via SSDP: M-SEARCH to 239.255.255.250:1900, collect
+ * the replies, fetch each device's description. From Android 17 on this falls
+ * under ACCESS_LOCAL_NETWORK; without that permission the socket returns EPERM.
  */
 object Ssdp {
 
@@ -57,7 +57,7 @@ object Ssdp {
                 socket.soTimeout = 500
                 val target = InetAddress.getByName(ADDR)
 
-                // Mehrfach senden: UDP-Multicast geht im WLAN gern mal verloren.
+                // Send several times: UDP multicast often gets lost on Wi-Fi.
                 repeat(3) {
                     runCatching { socket.send(DatagramPacket(query, query.size, target, PORT)) }
                 }
@@ -88,10 +88,10 @@ object Ssdp {
     }
 
     /**
-     * Rueckfall, wenn SSDP (Multicast) nichts bringt - etwa weil der Router
-     * Multicast filtert: das eigene /24-Subnetz absuchen. Erst ein schneller
-     * TCP-Test auf Port 1400, nur wer antwortet, wird vollstaendig abgefragt.
-     * Gefundene Speaker werden sofort ueber [onFound] gemeldet.
+     * Fallback when SSDP (multicast) finds nothing, for example because the
+     * router filters multicast: scan our own /24 subnet. First a quick TCP test
+     * on port 1400; only hosts that answer are queried in full.
+     * Found speakers are reported right away through [onFound].
      */
     fun scanSubnet(localIp: String, onFound: ((Speaker) -> Unit)? = null): List<Speaker> {
         val base = localIp.substringBeforeLast('.')
@@ -117,7 +117,7 @@ object Ssdp {
         return visibleOnly(found.distinctBy { it.udn }).sortedBy { it.room.lowercase() }
     }
 
-    /** Fuer manuell eingetragene Adressen (und den Emulator, der kein Multicast kann). */
+    /** For manually entered addresses (and the emulator, which cannot do multicast). */
     fun probe(ip: String): Speaker? =
         describe("http://$ip:1400/xml/device_description.xml", ip)
 
@@ -141,9 +141,8 @@ object Ssdp {
     }
 
     /**
-     * Die zweite Box eines Stereopaars oder ein Sub antworten auch auf SSDP,
-     * lassen sich aber nicht eigenstaendig bespielen. Die Topologie markiert sie
-     * mit Invisible="1".
+     * The second speaker of a stereo pair or a Sub also answer SSDP, but
+     * cannot play on their own. The topology marks them with Invisible="1".
      */
     fun visibleOnly(list: List<Speaker>): List<Speaker> {
         val first = list.firstOrNull() ?: return list
@@ -159,9 +158,9 @@ object Ssdp {
 }
 
 /**
- * Steuerung eines Speakers ueber UPnP/SOAP auf Port 1400. Funktioniert nur,
- * solange in der Sonos-App unter Konto > Datenschutz und Sicherheit >
- * Verbindungssicherheit "UPnP" eingeschaltet ist (Standard: an).
+ * Controls a speaker over UPnP/SOAP on port 1400. Only works as long as "UPnP"
+ * is turned on in the Sonos app under Account > Privacy & Security >
+ * Connection Security (default: on).
  */
 class Sonos(val speaker: Speaker) {
 
@@ -188,12 +187,12 @@ class Sonos(val speaker: Speaker) {
             .replace("&amp;", "&")
     }
 
-    // ---- Wiedergabe -------------------------------------------------------
+    // ---- Playback ---------------------------------------------------------
 
     /**
-     * Zeigt den Sonos auf unseren Live-Stream. Leere Metadaten wie bei der
-     * Linux-Bridge: damit spielt der Sonos einen WAV-Stream unter einer
-     * normalen http-URI zuverlaessig ab.
+     * Points the Sonos at our live stream. Empty metadata as in the Linux
+     * bridge: that way the Sonos reliably plays a WAV stream from a plain
+     * http URI.
      */
     fun playStream(url: String) {
         avt(
@@ -213,18 +212,18 @@ class Sonos(val speaker: Speaker) {
     fun transportState(): String =
         value(avt("GetTransportInfo", "<InstanceID>0</InstanceID>"), "CurrentTransportState") ?: ""
 
-    /** Die URI, die der Speaker gerade spielt (leer, wenn nichts gesetzt ist). */
+    /** The URI the speaker is currently playing (empty if none is set). */
     fun currentUri(): String =
         unesc(value(avt("GetMediaInfo", "<InstanceID>0</InstanceID>"), "CurrentURI") ?: "")
 
-    // ---- Gruppen ----------------------------------------------------------
+    // ---- Groups -----------------------------------------------------------
 
     fun zoneGroupState(): String =
         unesc(value(soap(ZGT, ZGT_PATH, "GetZoneGroupState", ""), "ZoneGroupState") ?: "")
 
     /**
-     * In einer Gruppe nimmt nur der Koordinator eine Quelle an. Liefert die
-     * IP des Koordinators der Gruppe, zu der dieser Speaker gehoert.
+     * In a group, only the coordinator accepts a source. Returns the IP of the
+     * coordinator of the group this speaker belongs to.
      */
     fun coordinatorIp(): String {
         val state = runCatching { zoneGroupState() }.getOrNull() ?: return speaker.ip
@@ -242,7 +241,7 @@ class Sonos(val speaker: Speaker) {
         return speaker.ip
     }
 
-    // ---- Lautstaerke ------------------------------------------------------
+    // ---- Volume -----------------------------------------------------------
 
     fun volume(): Int =
         value(rc("GetVolume", "<InstanceID>0</InstanceID><Channel>Master</Channel>"), "CurrentVolume")

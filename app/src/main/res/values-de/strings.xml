@@ -45,6 +45,10 @@
     <string name="share">Teilen</string>
     <string name="save_downloads">In Downloads speichern</string>
     <string name="close">Schließen</string>
+    <string name="licenses">Open-Source-Lizenzen</string>
+    <string name="licenses_intro">Sunus ist Open Source unter der MIT-Lizenz und nutzt die unter \"Hinweise\" genannten Bausteine.</string>
+    <string name="licenses_notices">Hinweise und Urheber</string>
+    <string name="licenses_app">Lizenz von Sunus (MIT)</string>
     <string name="cancel">Abbrechen</string>
 
     <!-- Kopplung -->

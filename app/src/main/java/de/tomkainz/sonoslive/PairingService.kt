@@ -19,16 +19,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Einmalige Kopplung fuer den Alle-Apps-Modus.
+ * One-time pairing for the All apps mode.
  *
- * Android schliesst den Dialog "Geraet mit Kopplungscode koppeln", sobald die
- * Einstellungen in den Hintergrund gehen, und mit ihm verfaellt der Code.
- * Deshalb wird der Code hier ueber eine Benachrichtigung mit Eingabefeld
- * abgefragt, waehrend der Dialog offen bleibt. Den Port findet der Dienst
- * selbst per mDNS (_adb-tls-pairing._tcp).
+ * Android closes the "Pair device with pairing code" dialog as soon as
+ * Settings goes to the background, and the code expires with it.
+ * That is why the code is asked for here through a notification with an
+ * input field, while the dialog stays open. The service finds the port
+ * itself via mDNS (_adb-tls-pairing._tcp).
  *
- * Als Vordergrunddienst, weil Android Apps im Hintergrund sonst einfriert und
- * die Suche dann keine Antwort mehr bekommt.
+ * Runs as a foreground service, because Android otherwise freezes background
+ * apps and the search then gets no more answers.
  */
 class PairingService : Service() {
 
@@ -43,6 +43,17 @@ class PairingService : Service() {
 
     @Volatile
     private var busy = false
+        set(value) {
+            field = value
+            AppState.adbBusy.value = value
+        }
+
+    @Volatile
+    private var active = false
+
+    // Last shown state, for showing it again after it was swiped away.
+    private var lastText = ""
+    private var lastInput = true
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -56,7 +67,18 @@ class PairingService : Service() {
                 finish(getString(R.string.pair_cancelled))
                 return START_NOT_STICKY
             }
+            ACTION_DISMISSED -> {
+                // Swiped away (possible for foreground services since Android 14):
+                // show it again right away, otherwise there is no field for the code.
+                if (active) update(lastText, lastInput) else stopSelf()
+                return START_NOT_STICKY
+            }
         }
+
+        // "Start pairing" again: show the notification again, the search
+        // keeps running. While the code is being checked, change nothing.
+        if (busy) return START_NOT_STICKY
+        active = true
 
         createChannel()
         getSystemService(NotificationManager::class.java).cancel(RESULT_ID)
@@ -66,7 +88,8 @@ class PairingService : Service() {
             notification(getString(R.string.pair_notif_open), withInput = true),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
         )
-        AppState.adbBusy.value = true
+        lastText = getString(R.string.pair_notif_open)
+        lastInput = true
         AppState.adbMessage.value = getString(R.string.pair_waiting)
         startDiscovery()
         handler.removeCallbacksAndMessages(TIMEOUT_TOKEN)
@@ -76,6 +99,7 @@ class PairingService : Service() {
     }
 
     override fun onDestroy() {
+        active = false
         mdns?.stop()
         mdns = null
         handler.removeCallbacksAndMessages(null)
@@ -111,7 +135,7 @@ class PairingService : Service() {
         AppState.adbMessage.value = getString(R.string.pair_pairing)
 
         AppState.scope.launch {
-            // Kam der Code schneller als die Suche, kurz auf den Port warten.
+            // If the code arrived before the search finished, wait briefly for the port.
             var waited = 0
             while (port <= 0 && waited < 15_000) {
                 delay(250)
@@ -150,23 +174,26 @@ class PairingService : Service() {
     }
 
     private fun finish(message: String) {
+        active = false
+        busy = false
         AppState.adbMessage.value = message
-        AppState.adbBusy.value = false
         mdns?.stop()
         mdns = null
         handler.removeCallbacksAndMessages(null)
-        // Ergebnis als eigene Benachrichtigung. Die laufende nach
-        // STOP_FOREGROUND_DETACH zu ueberschreiben ging im Emulator verloren:
-        // "Gekoppelt. Verbinde..." blieb stehen, obwohl alles fertig war.
+        // Result as a separate notification. Overwriting the ongoing one after
+        // STOP_FOREGROUND_DETACH got lost in the emulator:
+        // "Paired. Connecting..." stayed visible although everything was done.
         stopForeground(STOP_FOREGROUND_REMOVE)
         getSystemService(NotificationManager::class.java)
             .notify(RESULT_ID, notification(message, withInput = false, ongoing = false))
         stopSelf()
     }
 
-    // ---- Benachrichtigung ---------------------------------------------------
+    // ---- Notification -------------------------------------------------------
 
     private fun update(text: String, withInput: Boolean) {
+        lastText = text
+        lastInput = withInput
         getSystemService(NotificationManager::class.java)
             .notify(NOTIFICATION_ID, notification(text, withInput))
     }
@@ -186,8 +213,8 @@ class PairingService : Service() {
 
         if (withInput) {
             val input = RemoteInput.Builder(KEY_CODE).setLabel(getString(R.string.pair_code_label)).build()
-            // FLAG_MUTABLE ist fuer RemoteInput noetig, damit das System den
-            // eingegebenen Text einfuegen kann. Die Absicht ist explizit.
+            // FLAG_MUTABLE is required for RemoteInput so the system can insert
+            // the entered text. The intent is explicit.
             val reply = PendingIntent.getService(
                 this, 1,
                 Intent(this, PairingService::class.java).setAction(ACTION_CODE),
@@ -208,14 +235,20 @@ class PairingService : Service() {
                 PendingIntent.FLAG_IMMUTABLE
             )
             builder.addAction(Notification.Action.Builder(null, getString(R.string.cancel), cancel).build())
+            val dismissed = PendingIntent.getService(
+                this, 3,
+                Intent(this, PairingService::class.java).setAction(ACTION_DISMISSED),
+                PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.setDeleteIntent(dismissed)
         }
         return builder.build()
     }
 
     private fun createChannel() {
         val manager = getSystemService(NotificationManager::class.java)
-        // Hohe Wichtigkeit: die Benachrichtigung soll ueber dem Kopplungsdialog
-        // einblenden, damit man den Code eingeben kann, ohne ihn zu verlassen.
+        // High importance: the notification should pop up over the pairing dialog,
+        // so the code can be entered without leaving it.
         val channel = NotificationChannel(
             CHANNEL_ID, getString(R.string.channel_pairing), NotificationManager.IMPORTANCE_HIGH
         ).apply { setShowBadge(false) }
@@ -230,11 +263,12 @@ class PairingService : Service() {
         private const val KEY_CODE = "code"
         private const val ACTION_CODE = "de.tomkainz.sonoslive.PAIR_CODE"
         private const val ACTION_CANCEL = "de.tomkainz.sonoslive.PAIR_CANCEL"
+        private const val ACTION_DISMISSED = "de.tomkainz.sonoslive.PAIR_DISMISSED"
         private const val EXTRA_PORT = "port"
         private const val TIMEOUT_MS = 5 * 60_000L
         private val TIMEOUT_TOKEN = Any()
 
-        /** Startet die Kopplung; [manualPort] nur, falls die Suche im WLAN scheitert. */
+        /** Starts pairing; [manualPort] only if the search on the Wi-Fi fails. */
         fun start(context: Context, manualPort: Int? = null) {
             val intent = Intent(context, PairingService::class.java)
             manualPort?.let { intent.putExtra(EXTRA_PORT, it) }

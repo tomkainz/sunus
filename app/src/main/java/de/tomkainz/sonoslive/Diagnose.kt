@@ -12,17 +12,17 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Fehlercodes und Fehlerberichte.
+ * Error codes and error reports.
  *
- * Jeder Fehler beim Streamen bekommt einen kurzen Code (etwa SL-A2), der in der
- * Meldung steht. Dazu entsteht ein Bericht mit Geraet, Version und allen
- * Einzelheiten (beim Alle-Apps-Modus Exit-Code und Log des Helfers). Er laesst
- * sich teilen oder unter "Downloads" speichern. Abstuerze der App landen als
- * SL-X1 ebenfalls im Bericht und werden beim naechsten Start gemeldet.
+ * Every streaming error gets a short code (such as SL-A2) that appears in the
+ * message. A report is also created with the device, version and all
+ * details (in All apps mode, the helper's exit code and log). It can be
+ * shared or saved to "Downloads". App crashes also end up in the report as
+ * SL-X1 and are shown on the next start.
  */
 object Diagnose {
 
-    /** Codes: A = Alle Apps, S = Standard, D = Dienst/Netz, X = Absturz. */
+    /** Codes: A = All apps, S = Standard, D = service/network, X = crash. */
     enum class Code(val text: Int) {
         A1(R.string.code_a1),
         A2(R.string.code_a2),
@@ -40,17 +40,17 @@ object Diagnose {
         val label: String get() = "SL-$name"
     }
 
-    private const val REPORT_FILE = "fehlerbericht.txt"
-    private const val CRASH_FILE = "absturz.txt"
+    private const val REPORT_FILE = "error-report.txt"
+    private const val CRASH_FILE = "crash.txt"
 
-    private val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.GERMANY)
+    private val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT)
     private lateinit var dir: File
 
     fun init(context: Context) {
         dir = context.filesDir
         AppState.report.value = File(dir, REPORT_FILE).takeIf { it.exists() }?.readText()
 
-        // Absturz beim letzten Lauf: jetzt melden, Bericht liegt schon bereit.
+        // Crash during the last run: report it now, the report is already in place.
         val crash = File(dir, CRASH_FILE)
         if (crash.exists()) {
             val text = crash.readText()
@@ -72,18 +72,18 @@ object Diagnose {
         }
     }
 
-    /** Fehler seit dem letzten Start; spaetere ueberschreiben fruehere nicht. */
+    /** Errors since the last start; later ones do not overwrite earlier ones. */
     private val session = mutableListOf<Pair<Code, String>>()
 
-    /** Neuer Start des Streams: der naechste Fehler beginnt einen neuen Bericht. */
+    /** New stream start: the next error begins a new report. */
     fun beginSession() {
         synchronized(session) { session.clear() }
     }
 
     /**
-     * Meldet einen Fehler: kurze Meldung mit Code in der Oberflaeche, voller
-     * Bericht zum Teilen. [detail] ergaenzt die Meldung (etwa die Ausnahme),
-     * [extra] kommt nur in den Bericht.
+     * Reports an error: a short message with code in the UI, the full
+     * report for sharing. [detail] is appended to the message (such as the
+     * exception), [extra] goes into the report only.
      */
     fun fail(context: Context, code: Code, detail: String? = null, extra: String = "") {
         val suffix = detail?.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""
@@ -99,7 +99,7 @@ object Diagnose {
         AppState.message.value = context.getString(R.string.error_format, short, code.label)
     }
 
-    /** Der Bericht ist immer englisch, gleich welche Sprache das Handy hat. */
+    /** The report is always in English, whatever language the phone uses. */
     private fun english(context: Context): Context = context.createConfigurationContext(
         Configuration(context.resources.configuration).apply { setLocale(Locale.ENGLISH) }
     )
@@ -115,7 +115,7 @@ object Diagnose {
         val speaker = AppState.selected.value?.let { "${it.room}, ${it.ip}, ${it.model}" } ?: "none"
         val en = english(context)
         return buildString {
-            appendLine("Sunus – error report")
+            appendLine("Sunus error report")
             appendLine("Code:        " + codes.joinToString(", ") { "${it.label} ${en.getString(it.text)}" })
             appendLine("Time:        ${stamp.format(Date())}")
             appendLine("App:         $version")
@@ -130,7 +130,7 @@ object Diagnose {
         }
     }
 
-    /** Oeffnet das Teilen-Menue mit dem letzten Bericht. */
+    /** Opens the share sheet with the latest report. */
     fun share(context: Context) {
         val report = AppState.report.value ?: return
         val send = Intent(Intent.ACTION_SEND)
@@ -143,11 +143,11 @@ object Diagnose {
         )
     }
 
-    /** Legt den letzten Bericht als Textdatei unter "Downloads" ab. */
+    /** Saves the latest report as a text file in "Downloads". */
     fun saveToDownloads(context: Context) {
         val report = AppState.report.value ?: return
         val name = "Sunus-report-" +
-            SimpleDateFormat("yyyyMMdd-HHmmss", Locale.GERMANY).format(Date()) + ".txt"
+            SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(Date()) + ".txt"
         runCatching {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, name)

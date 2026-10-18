@@ -10,14 +10,14 @@ import android.media.projection.MediaProjection
 import de.tomkainz.sonoslive.adb.AdbManager
 
 /**
- * Liest Audio und reicht es als PCM an den [LiveStreamServer] weiter. Zwei Wege,
- * dieselbe Ausgabe (48 kHz, Stereo, 16 Bit):
+ * Reads audio and passes it as PCM to the [LiveStreamServer]. Two paths,
+ * the same output (48 kHz, stereo, 16 bit):
  *
- *  ALL_APPS  - ein Helfer mit Shell-Rechten liest REMOTE_SUBMIX. Erfasst jede
- *              App, das Handy selbst ist dabei stumm.
- *  STANDARD  - AudioPlaybackCapture in der App selbst. Ohne Einrichtung, aber
- *              Apps duerfen sich der Aufnahme entziehen; der Ton laeuft parallel
- *              weiter am Handy.
+ *  ALL_APPS  - a helper with shell rights reads REMOTE_SUBMIX. Captures every
+ *              app, and the phone itself stays muted.
+ *  STANDARD  - AudioPlaybackCapture inside the app. No setup, but apps
+ *              may opt out of capture; the sound keeps playing on the
+ *              phone as well.
  */
 class CaptureEngine(
     private val context: Context,
@@ -55,8 +55,8 @@ class CaptureEngine(
         val helper = shell
         shell = null
         if (helper != null) {
-            // stop() kommt vom Haupt-Thread; dort scheitert jeder Netzwerkzugriff
-            // still (NetworkOnMainThreadException), auch das Schliessen des Streams.
+            // stop() is called on the main thread, where every network access fails
+            // silently (NetworkOnMainThreadException), including closing the stream.
             Thread({
                 helper.close()
                 AdbManager.stopHelper(context)
@@ -66,7 +66,7 @@ class CaptureEngine(
         thread = null
     }
 
-    // ---- Standard (in der App) -------------------------------------------
+    // ---- Standard (inside the app) ---------------------------------------
 
     @SuppressLint("MissingPermission")
     private fun runStandard(projection: MediaProjection) {
@@ -110,7 +110,7 @@ class CaptureEngine(
         }
     }
 
-    // ---- Alle Apps (Shell-Helfer) ----------------------------------------
+    // ---- All apps (shell helper) -----------------------------------------
 
     private fun runAllApps() {
         try {
@@ -118,7 +118,7 @@ class CaptureEngine(
             val connected = try {
                 AdbManager.connect(context)
             } catch (e: Exception) {
-                // Dienst nicht gefunden: die Kopplung gilt noch, nur ist er gerade nicht da.
+                // Service not found: the pairing is still valid, it is just not available right now.
                 Diagnose.fail(context, Diagnose.Code.A1, e.message, AdbManager.status(context))
                 return
             }
@@ -128,14 +128,14 @@ class CaptureEngine(
                 return
             }
             AdbManager.grantSelf(context)
-            // Reste eines frueheren Laufs (etwa nach einem Absturz der App) wegraeumen.
+            // Clean up leftovers from an earlier run (for example after an app crash).
             AdbManager.stopHelper(context)
             val startedAt = System.currentTimeMillis()
             val process = AdbManager.startSubmixRecorder(context)
             shell = process
             val input = process.input
 
-            // Kopfzeile suchen: "PCM <rate> <kanaele>" oder "ERR <grund>".
+            // Look for the header line: "PCM <rate> <channels>" or "ERR <reason>".
             val header = readHeader(input)
             when {
                 header == null -> {
@@ -169,7 +169,7 @@ class CaptureEngine(
         }
     }
 
-    /** Liest Zeilen (bis LF), ueberspringt moegliche VM-Ausgabe, bis zur Markierung. */
+    /** Reads lines (up to LF), skipping any VM output, until the marker. */
     private fun readHeader(input: java.io.InputStream): String? {
         repeat(20) {
             val line = readAsciiLine(input) ?: return null

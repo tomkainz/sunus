@@ -1,3 +1,23 @@
+/*
+ * Copyright 2021 Muntashir Al-Islam
+ * Copyright (c) 2026 tomkainz
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Key and certificate handling follows the example app of libadb-android
+ * (dual licensed GPL-3.0-or-later OR Apache-2.0, used here under Apache-2.0).
+ */
+
 package de.tomkainz.sonoslive.adb;
 
 import android.content.Context;
@@ -45,11 +65,11 @@ import java.util.Random;
 import io.github.muntashirakon.adb.AbsAdbConnectionManager;
 
 /**
- * Haelt den selbst ausgestellten ADB-Schluessel dieser App. Einmal erzeugt,
- * danach aus dem App-Speicher geladen, damit das Handy die Kopplung behaelt.
+ * Holds this app's self-issued ADB key. Generated once, then loaded
+ * from app storage, so the phone keeps the pairing.
  *
- * Schluessel- und Zertifikatsablage nach dem Beispiel von libadb-android
- * (MuntashirAkon, GPL-3.0-or-later OR Apache-2.0).
+ * Key and certificate storage follows the example of libadb-android
+ * (MuntashirAkon, see the license header).
  */
 public class AdbKeyManager extends AbsAdbConnectionManager {
 
@@ -78,7 +98,7 @@ public class AdbKeyManager extends AbsAdbConnectionManager {
 
             String subject = "CN=Sunus";
             String algorithm = "SHA512withRSA";
-            // 10 Jahre; der Schluessel soll die Kopplung ueberdauern
+            // 10 years; the key should outlast the pairing
             long expiry = System.currentTimeMillis() + 10L * 365 * 86400_000L;
 
             CertificateExtensions extensions = new CertificateExtensions();

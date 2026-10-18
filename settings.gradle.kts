@@ -11,7 +11,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // libadb-android und sun-security-android gibt es nur dort
+        // libadb-android and sun-security-android are only available there
         maven("https://jitpack.io") {
             content { includeGroupByRegex("com\\.github\\.MuntashirAkon.*") }
         }

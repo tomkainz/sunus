@@ -9,15 +9,15 @@ android {
 
     defaultConfig {
         applicationId = "de.tomkainz.sonoslive"
-        // AudioPlaybackCapture gibt es ab Android 10
+        // AudioPlaybackCapture exists from Android 10
         minSdk = 29
         targetSdk = 37
-        versionCode = 11
+        versionCode = 14
         versionName = "1.0-beta"
     }
 
-    // Der Schluessel liegt nur lokal, nicht im Repository. Fehlt er, entsteht
-    // eine unsignierte Release-APK; zum Ausprobieren dann assembleDebug nehmen.
+    // The key is only stored locally, not in the repository. Without it the
+    // release APK is unsigned; use assembleDebug to try the app instead.
     val releaseKeystore = rootProject.file("keystore/sonoslive.jks")
 
     signingConfigs {
@@ -33,8 +33,8 @@ android {
 
     buildTypes {
         release {
-            // Kein R8: SubmixRecorder wird per app_process ueber seinen
-            // Klassennamen gestartet und darf weder umbenannt noch entfernt werden.
+            // No R8: SubmixRecorder is started by class name via app_process
+            // and must be neither renamed nor removed.
             isMinifyEnabled = false
             isShrinkResources = false
             if (releaseKeystore.exists()) {
@@ -78,8 +78,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
-    // Eingebauter ADB-Client: koppelt sich per "Kabelloses Debugging" mit dem
-    // eigenen Handy und startet so den Aufnahme-Helfer mit Shell-Rechten.
+    // Built-in ADB client: pairs with the phone itself via "Wireless debugging"
+    // and uses that to start the capture helper with shell privileges.
     implementation("com.github.MuntashirAkon:libadb-android:3.1.1")
     implementation("com.github.MuntashirAkon:sun-security-android:1.1")
     implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.2")

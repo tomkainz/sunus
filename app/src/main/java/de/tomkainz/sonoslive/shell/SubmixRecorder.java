@@ -14,27 +14,27 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Laeuft NICHT in der App, sondern als eigener Prozess mit Shell-Rechten:
+ * Does NOT run in the app, but as a separate process with shell permissions:
  *
  *   CLASSPATH=/data/app/.../base.apk app_process / de.tomkainz.sonoslive.shell.SubmixRecorder
  *
- * gestartet ueber die ADB-Verbindung der App, nur solange der Nutzer streamt.
- * Als Shell darf der Prozess die Quelle REMOTE_SUBMIX oeffnen. Android leitet
- * dann den gesamten Medien-Mix dorthin um, auch den von Apps, die die normale
- * Aufnahme sperren. Das Handy selbst wird dabei stumm, der Ton laeuft nur noch
- * zum Sonos.
+ * started via the app's ADB connection, only while the user is streaming.
+ * As the shell, the process may open the REMOTE_SUBMIX source. Android then
+ * redirects the whole media mix there, including that of apps which block normal
+ * capture. The phone itself goes silent, the sound only goes
+ * to the Sonos.
  *
- * Protokoll auf stdout: eine Textzeile "PCM <rate> <kanaele>" oder "ERR <grund>",
- * danach rohes PCM, 16 Bit little-endian, verschraenkt. Endet die Verbindung,
- * schlaegt write() fehl und der Prozess beendet sich; die Umleitung des Tons
- * faellt damit automatisch weg.
+ * Protocol on stdout: one text line "PCM <rate> <channels>" or "ERR <reason>",
+ * then raw PCM, 16 bit little-endian, interleaved. When the connection ends,
+ * write() fails and the process exits; the audio redirect
+ * then goes away automatically.
  */
 public final class SubmixRecorder {
 
     static final int SAMPLE_RATE = 48000;
     static final int CHANNELS = 2;
 
-    // Android liefert den Mix in Bloecken zu 1024 Frames; kleiner lesen bringt nichts.
+    // Android delivers the mix in blocks of 1024 frames; reading smaller gains nothing.
     private static final int READ_BYTES = 1024 * CHANNELS * 2;
 
     private SubmixRecorder() {
@@ -75,7 +75,7 @@ public final class SubmixRecorder {
                 out.write(("ERR " + reason + "\n").getBytes(StandardCharsets.UTF_8));
                 out.flush();
             } catch (IOException ignored) {
-                // Gegenstelle ist weg - genau der normale Weg zum Beenden
+                // The other side is gone, which is the normal way to end
             }
         } finally {
             if (recorder != null) {

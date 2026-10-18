@@ -12,14 +12,14 @@ import java.util.Date
 import java.util.Locale
 
 enum class CaptureMode {
-    /** Shell-Helfer ueber die eigene ADB-Verbindung: jede App, Handy stumm. */
+    /** Shell helper over the app's own ADB connection: every app, phone muted. */
     ALL_APPS,
 
-    /** Offizielle AudioPlaybackCapture: ohne Einrichtung, aber Apps duerfen sperren. */
+    /** Official AudioPlaybackCapture: no setup, but apps may opt out. */
     STANDARD
 }
 
-/** Ein gemeinsamer Zustand fuer Oberflaeche und Dienst. */
+/** Shared state for the UI and the service. */
 object AppState {
 
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -33,12 +33,13 @@ object AppState {
     val muteLocal = MutableStateFlow(true)
     val streamBaseOverride = MutableStateFlow("")
 
-    /** Ist die ADB-Kopplung einmal gelungen? */
+    /** Has ADB pairing succeeded once? */
     val adbPaired = MutableStateFlow(false)
+    /** Only while the code is being checked; before that, pairing can be restarted. */
     val adbBusy = MutableStateFlow(false)
     val adbMessage = MutableStateFlow<String?>(null)
 
-    /** Setzt die Oberflaeche, wenn der Alle-Apps-Modus eine Kopplung braucht. */
+    /** Set for the UI when the All apps mode needs pairing. */
     val requestPairing = MutableStateFlow(false)
 
     fun needsPairing() {
@@ -50,7 +51,7 @@ object AppState {
     val status = MutableStateFlow("")
     val message = MutableStateFlow<String?>(null)
 
-    /** Letzter Fehlerbericht (siehe [Diagnose]), zum Teilen oder Speichern. */
+    /** Latest error report (see [Diagnose]), for sharing or saving. */
     val report = MutableStateFlow<String?>(null)
     val streamUrl = MutableStateFlow<String?>(null)
     val clients = MutableStateFlow(0)
@@ -60,7 +61,7 @@ object AppState {
     val volume = MutableStateFlow<Int?>(null)
     val requestLog = MutableStateFlow<List<String>>(emptyList())
 
-    /** Fuer Meldungen aus Stellen ohne eigenen Context. */
+    /** For messages from places without their own Context. */
     private lateinit var app: Context
 
     fun text(id: Int, vararg args: Any): String = app.getString(id, *args)
@@ -122,11 +123,11 @@ object AppState {
         searching.value = true
         scope.launch {
             try {
-                // 1. Schnell per SSDP (Multicast)
+                // 1. Quickly via SSDP (multicast)
                 var found = Ssdp.discover(context)
 
-                // 2. Bringt das nichts, das eigene Netz absuchen (Router filtert
-                //    manchmal Multicast). Treffer erscheinen sofort in der Liste.
+                // 2. If that finds nothing, scan the local network (routers
+                //    sometimes filter multicast). Hits show up in the list right away.
                 if (found.isEmpty()) {
                     val ip = Net.localIp(context)
                     if (ip != null) {
@@ -142,7 +143,7 @@ object AppState {
                     .sortedBy { it.room.lowercase() }
                 speakers.value = merged
                 if (current == null && merged.size == 1) select(merged.first())
-                // Leerzustand steht bereits in der Liste; keine doppelte Meldung.
+                // The empty state is already shown in the list; no duplicate message.
                 refreshVolume()
             } finally {
                 searching.value = false
@@ -150,7 +151,7 @@ object AppState {
         }
     }
 
-    /** Fuegt einen waehrend der Suche gefundenen Speaker sofort hinzu. */
+    /** Adds a speaker found during the search right away. */
     private fun addFound(speaker: Speaker) {
         val merged = (speakers.value + speaker).distinctBy { it.udn }
             .sortedBy { it.room.lowercase() }
@@ -188,7 +189,7 @@ object AppState {
         }
     }
 
-    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.GERMANY)
+    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ROOT)
 
     fun log(line: String) {
         val stamped = "${timeFormat.format(Date())}  $line"

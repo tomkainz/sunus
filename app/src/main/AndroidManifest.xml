@@ -2,16 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Netzwerk. ACCESS_LOCAL_NETWORK ist ab Android 17 Pflicht und deckt beide
-         Richtungen ab: SOAP an den Sonos und den Abruf des Streams durch den
-         Sonos. Ohne sie laufen Verbindungen lautlos in Timeouts. -->
+    <!-- Network. ACCESS_LOCAL_NETWORK is required from Android 17 and covers
+         both directions: SOAP to the Sonos and the Sonos fetching the stream.
+         Without it, connections silently time out. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
-    <!-- Standard-Modus: Ton anderer Apps per AudioPlaybackCapture mitschneiden -->
+    <!-- Standard mode: capture other apps' audio via AudioPlaybackCapture -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
@@ -21,14 +21,14 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Erteilt sich die App einmal selbst ueber ihre ADB-Shell. Damit schaltet
-         sie "Kabelloses Debugging" nach Neustart oder WLAN-Wechsel selbst
-         wieder ein, ohne dass der Nutzer in die Entwickleroptionen muss. -->
+    <!-- The app grants this to itself once through its ADB shell. With it, the
+         app turns "Wireless debugging" back on after a reboot or Wi-Fi change,
+         without the user having to open Developer options. -->
     <uses-permission
         android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
 
-    <!-- Nur um zu pruefen, ob es die Kachel "Kabelloses Debugging" gibt. -->
+    <!-- Only to check whether the "Wireless debugging" tile exists. -->
     <queries>
         <package android:name="com.android.settings" />
     </queries>

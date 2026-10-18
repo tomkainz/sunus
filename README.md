@@ -2,15 +2,15 @@
 
 **Sonos Bridge** for Android, successor to [tomkainz/sonos-bridge](https://github.com/tomkainz/sonos-bridge)
 
-An Android app that plays your phone's audio live on a Sonos speaker. The phone takes the role of a Bluetooth source, only over Wi-Fi and without an extra computer.
+An Android app that plays your phone's audio live on a Sonos speaker. The phone acts like a Bluetooth source, except the audio goes over Wi-Fi and no extra computer is involved.
 
-The first Sonos Bridge needed a Linux machine as the Bluetooth receiver. The phone now does that job itself.
+The first Sonos Bridge needed a Linux machine as the Bluetooth receiver. Here the phone does that job itself.
 
 Current release: version 1.0, beta.
 
 ## Built with AI
 
-This app was built with the help of AI, and it works anyway. There is always skepticism about that, but something can be useful all the same.
+I built this app with the help of AI. Plenty of people are skeptical about that, and I understand why. It works anyway.
 
 ## How it works
 
@@ -20,13 +20,11 @@ The app finds speakers via SSDP. If the router filters multicast, it scans the l
 
 ## Capture modes
 
-The app is in English and German. It follows the phone's language; on Android 13 and newer it can be set per app under Settings > Apps > Sunus > Language.
-
 ### All apps
 
 Captures all media audio, including apps that block normal recording. The phone itself stays silent.
 
-A small helper (`shell/SubmixRecorder`) runs with shell privileges and reads the `REMOTE_SUBMIX` source. It is started over an ADB connection that the app opens to itself. No root and no PC needed. scrcpy works on the same principle with `--audio-source=output`.
+A small helper (`shell/SubmixRecorder`) runs with shell privileges and reads the `REMOTE_SUBMIX` source. The app starts it over an ADB connection to itself, so you need neither root nor a PC. scrcpy works on the same principle with `--audio-source=output`.
 
 One-time setup:
 
@@ -34,13 +32,13 @@ One-time setup:
 2. Turn it on and tap **Pair device with pairing code**.
 3. Leave the dialog open, pull down the notification shade and enter the 6-digit code in the **Pair Sunus** notification.
 
-The app finds the port itself via mDNS. The code is entered through the notification because Android closes the pairing dialog as soon as you leave Settings. There is no public intent for the Wireless debugging page; the app takes the same route as a long press on the Quick Settings tile. Where that isn't available, Developer options open instead.
+The app finds the port itself via mDNS. You enter the code in the notification because Android closes the pairing dialog as soon as you leave Settings. There is no public intent for the Wireless debugging page; the app takes the same route as a long press on the Quick Settings tile. Where that isn't available, Developer options open instead.
 
-While pairing, the app grants itself `WRITE_SECURE_SETTINGS` and the `PROJECT_MEDIA` app op once via the shell. With that it turns Wireless debugging back on by itself after a reboot or a Wi-Fi change, like Shizuku does since version 13.6. Requirements: Developer options stay enabled, and the Wi-Fi network was confirmed once with "Always allow on this network". The app remembers the ADB port; with a known port the connection is up in a fraction of a second, otherwise it searches via mDNS. This mode requires Android 12.
+During pairing the app uses the shell once to grant itself `WRITE_SECURE_SETTINGS` and the `PROJECT_MEDIA` app op. That lets it turn Wireless debugging back on after a reboot or a Wi-Fi change, as Shizuku has done since version 13.6. Requirements: Developer options stay enabled, and the Wi-Fi network was confirmed once with "Always allow on this network". The app remembers the ADB port. With a known port the connection is up in a fraction of a second; otherwise it searches via mDNS. This mode requires Android 12.
 
 ### Standard
 
-Needs no setup and uses the official `AudioPlaybackCapture` API, for which Android asks for consent on every start. Once "All apps" has been set up, that prompt no longer appears. Apps may opt out of this capture; Netflix and Audible do, for example. The phone keeps playing the audio in parallel. If you don't want that, turn down the media volume on the phone; according to user reports the stream to the Sonos is not affected.
+This mode needs no setup. It uses the official `AudioPlaybackCapture` API, and Android asks for consent on every start. Once "All apps" has been set up, that prompt no longer appears. Apps may opt out of this capture; Netflix and Audible do, for example. The phone keeps playing the audio as well. If you don't want that, turn down the phone's media volume; users report that this does not affect the stream to the Sonos.
 
 ## Requirements
 
@@ -53,11 +51,11 @@ Tested with Android 17 and a Sonos Play:1 running S2 software.
 
 ## Latency
 
-The stream is lossless but arrives at the speaker an estimated one to three seconds late. Most of that is probably buffered by the Sonos itself. Fine for music; for video, picture and sound drift apart.
+The stream is lossless but reaches the speaker an estimated one to three seconds late, most of it probably buffered by the Sonos itself. That is fine for music. With video, picture and sound drift apart.
 
 ## Error codes
 
-If a start fails, the app shows a code such as `SL-A1` and writes an error report with the device, Android version and the helper's log lines. It can be shared straight from the message or under "⋯", or saved to Downloads.
+If a start fails, the app shows a code such as `SL-A1` and writes an error report with the device, Android version and the helper's log lines. You can share the report straight from the message or under "⋯", or save it to Downloads.
 
 ## Installation
 
@@ -93,9 +91,24 @@ AGP 9.3.1, Kotlin Compose plugin 2.4.10, compileSdk 37, minSdk 29.
 - Does the stream stay at full level in Standard mode when the phone's media volume is at zero?
 - The latency is estimated, not measured.
 
+## License
+
+Sunus is released under the [MIT License](LICENSE).
+
+Three source files are adapted from Apache-2.0 projects and stay under the Apache License 2.0, as noted in their headers: `shell/ShellRuntime.java` and `shell/ShellContext.java` (from scrcpy) and `adb/AdbKeyManager.java` (from the libadb-android example).
+
 ## Third-party code
 
-- [libadb-android](https://github.com/MuntashirAkon/libadb-android) (GPL-3.0-or-later or Apache-2.0) for the ADB connection
-- [sun-security-android](https://github.com/MuntashirAkon/sun-security-android) (GPL-2.0) for the ADB certificate
-- [AndroidHiddenApiBypass](https://github.com/LSPosed/AndroidHiddenApiBypass) (Apache-2.0)
-- `shell/ShellRuntime.java` and `shell/ShellContext.java` follow [scrcpy](https://github.com/Genymobile/scrcpy) (Apache-2.0)
+| Component | Used for | License |
+|---|---|---|
+| [libadb-android](https://github.com/MuntashirAkon/libadb-android) 3.1.1 | ADB connection and pairing | GPL-3.0-or-later or Apache-2.0, used under Apache-2.0; parts BSD-3-Clause and MIT |
+| [spake2-java](https://github.com/MuntashirAkon/spake2-java) 2.2.1 (via libadb-android) | pairing code exchange | LGPL-3.0; native part also ISC, MIT, LGPL-2.1, Apache-2.0 |
+| [sun-security-android](https://github.com/MuntashirAkon/sun-security-android) 1.1 | ADB certificate | GPL-2.0 with Classpath exception |
+| [Bouncy Castle](https://www.bouncycastle.org) 1.81 (via libadb-android) | cryptography | MIT |
+| [AndroidHiddenApiBypass](https://github.com/LSPosed/AndroidHiddenApiBypass) 6.2 | access to the system TLS stack | Apache-2.0 |
+| [scrcpy](https://github.com/Genymobile/scrcpy) | template for the shell helper | Apache-2.0 |
+| AndroidX, Jetpack Compose, Kotlin, kotlinx.coroutines | app framework | Apache-2.0 |
+
+All libraries are used unmodified. The Classpath exception keeps GPL-2.0 from extending to Sunus. To swap the LGPL library for a modified version, build Sunus from source.
+
+Copyright notices and the full license texts are in [`app/src/main/assets/licenses`](app/src/main/assets/licenses) and in the app under "⋯" > **Open-source licenses**.

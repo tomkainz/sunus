@@ -9,8 +9,8 @@ class App : Application() {
 
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
-        // libadb-android greift auf verborgene Plattform-APIs zu; ohne die
-        // Freigabe scheitert der Verbindungsaufbau auf Android 9+.
+        // libadb-android uses hidden platform APIs; without the
+        // exemption, connecting fails on Android 9+.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             runCatching { HiddenApiBypass.addHiddenApiExemptions("L") }
         }

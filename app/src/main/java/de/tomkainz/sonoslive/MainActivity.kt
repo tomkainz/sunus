@@ -13,6 +13,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
 import de.tomkainz.sonoslive.adb.AdbManager
 import kotlinx.coroutines.launch
 
@@ -20,7 +21,16 @@ class MainActivity : ComponentActivity() {
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { refreshPermissions() }
+    ) {
+        refreshPermissions()
+        // If the notification request came from "Start pairing", continue right away.
+        val port = pairingAfterPermission
+        pairingAfterPermission = null
+        if (port != null && notificationsAllowed()) startPairing(port.takeIf { it > 0 })
+    }
+
+    /** Port (0 = automatic) of a pairing that is waiting for the notification permission. */
+    private var pairingAfterPermission: Int? = null
 
     private val projectionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -34,7 +44,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Gestartet wird mit dem schwarzen Startbild (Theme.SonosLive.Start).
+        // The app launches with the black splash screen (Theme.SonosLive.Start).
         setTheme(R.style.Theme_SonosLive)
         super.onCreate(savedInstanceState)
 
@@ -59,15 +69,15 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         refreshPermissions()
-        // ADB schon beim Oeffnen verbinden: die Suche nach dem Port dauert
-        // einige Sekunden, "Start" geht dann sofort los.
+        // Connect ADB as soon as the app opens: finding the port takes
+        // a few seconds, so "Start" then begins immediately.
         if (AppState.mode.value == CaptureMode.ALL_APPS && AppState.adbPaired.value && !AppState.running.value) {
             val app = applicationContext
             AppState.scope.launch { runCatching { AdbManager.connect(app) } }
         }
     }
 
-    // ---- Start der gewaehlten Betriebsart --------------------------------
+    // ---- Start of the selected mode --------------------------------------
 
     private fun requestStart() {
         if (AppState.selected.value == null) {
@@ -82,8 +92,8 @@ class MainActivity : ComponentActivity() {
                     return
                 }
                 val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                // Nur Audio: wir erzeugen kein VirtualDisplay. Vollbild erzwingen,
-                // damit die "eine App"-Auswahl die Erfassung nicht einschraenkt.
+                // Audio only: we create no VirtualDisplay. Force the full display
+                // so the "single app" choice does not restrict the capture.
                 val intent = if (Build.VERSION.SDK_INT >= 34) {
                     val config = android.media.projection.MediaProjectionConfig
                         .createConfigForDefaultDisplay()
@@ -103,7 +113,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // ---- Berechtigungen ---------------------------------------------------
+    // ---- Permissions ------------------------------------------------------
 
     private fun needed(): List<String> {
         val list = mutableListOf(Manifest.permission.RECORD_AUDIO)
@@ -128,13 +138,14 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Startet die Kopplung: Dienst mit Code-Benachrichtigung und Port-Suche,
-     * dann "Kabelloses Debugging". Ohne Benachrichtigungen geht es nicht, weil
-     * der Code dort eingegeben wird.
+     * Starts pairing: a service with the code notification and port search,
+     * then "Wireless debugging". This does not work without notifications,
+     * because the code is entered there.
      */
     private fun startPairing(manualPort: Int?) {
-        if (Build.VERSION.SDK_INT >= 33 && !granted(Manifest.permission.POST_NOTIFICATIONS)) {
+        if (!notificationsAllowed()) {
             AppState.adbMessage.value = getString(R.string.pair_need_notifications)
+            pairingAfterPermission = manualPort ?: 0
             permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
             return
         }
@@ -142,12 +153,15 @@ class MainActivity : ComponentActivity() {
         openWirelessDebugging()
     }
 
+    private fun notificationsAllowed() =
+        Build.VERSION.SDK_INT < 33 || granted(Manifest.permission.POST_NOTIFICATIONS)
+
     /**
-     * Oeffnet direkt die Seite "Kabelloses Debugging", auf der "Geraet mit
-     * Kopplungscode koppeln" steht. Dafuer gibt es keine oeffentliche Absicht;
-     * der Weg ist derselbe wie beim langen Druck auf die Schnelleinstellungs-
-     * Kachel (im Emulator mit Android 17 geprueft). Fehlt die Kachel, etwa bei
-     * aelteren Versionen oder anderen Herstellern: Entwickleroptionen.
+     * Opens the "Wireless debugging" page directly, where "Pair device with
+     * pairing code" is listed. There is no public intent for this; the path
+     * is the same as a long press on the Quick Settings tile (tested in the
+     * emulator with Android 17). If the tile is missing, for example on
+     * older versions or other manufacturers: Developer options.
      */
     private fun openWirelessDebugging() {
         val developerOptions = android.provider.Settings.Global.getInt(
@@ -159,7 +173,7 @@ class MainActivity : ComponentActivity() {
             return
         }
         val tile = ComponentName(SETTINGS, "$SETTINGS.development.qstile.AdbWirelessDebuggingDevelopmentTile")
-        // Entwickler-Kacheln sind ausgeschaltet, bis man sie hinzufuegt; es geht nur darum, ob es sie gibt.
+        // Developer tiles stay disabled until added; all that matters is whether the tile exists.
         val hasTile = runCatching {
             packageManager.getServiceInfo(tile, PackageManager.MATCH_DISABLED_COMPONENTS)
         }.isSuccess
@@ -168,17 +182,27 @@ class MainActivity : ComponentActivity() {
                 .setClassName(SETTINGS, "$SETTINGS.qstile.QSTileLongPressGatewayActivity")
                 .putExtra(Intent.EXTRA_COMPONENT_NAME, tile)
             val opened = runCatching { startActivity(intent) }
-            if (opened.isSuccess) return
-            AppState.log("Kabelloses Debugging nicht direkt zu öffnen: ${opened.exceptionOrNull()}")
+            if (opened.isSuccess) {
+                // On some devices the gateway accepts the intent and still
+                // opens nothing. If the app is still in front afterwards: Developer options.
+                window.decorView.postDelayed({
+                    if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                        AppState.log("Wireless debugging did not open, opening Developer options")
+                        openDeveloperOptions()
+                    }
+                }, OPEN_CHECK_MS)
+                return
+            }
+            AppState.log("Cannot open Wireless debugging directly: ${opened.exceptionOrNull()}")
         } else {
-            AppState.log("Keine Kachel für Kabelloses Debugging, öffne Entwickleroptionen")
+            AppState.log("No tile for Wireless debugging, opening Developer options")
         }
         openDeveloperOptions()
     }
 
     private fun openDeveloperOptions() {
-        // Der Schluessel laesst die Einstellungen direkt zu "Kabelloses
-        // Debugging" scrollen und den Eintrag hervorheben.
+        // This key makes Settings scroll straight to "Wireless
+        // debugging" and highlight the entry.
         val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
             .putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -193,5 +217,6 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val SETTINGS = "com.android.settings"
+        const val OPEN_CHECK_MS = 1500L
     }
 }

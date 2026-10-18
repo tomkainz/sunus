@@ -19,11 +19,11 @@ import android.os.Looper
 import kotlinx.coroutines.launch
 
 /**
- * Haelt den Live-Stream am Leben, nimmt auf und zeigt den Sonos auf die URL.
+ * Keeps the live stream alive, captures audio and points the Sonos at the URL.
  *
- * Vordergrunddienst vom Typ mediaProjection: ab Android 14 muss die Zustimmung
- * zur Projektion vorliegen, bevor der Dienst mit diesem Typ in den Vordergrund
- * geht - darum kommt resultCode/data aus der Activity im Start-Intent mit.
+ * Foreground service of type mediaProjection: from Android 14 on, projection
+ * consent must exist before the service enters the foreground with this type,
+ * which is why resultCode/data from the Activity come along in the start Intent.
  */
 class LiveService : Service() {
 
@@ -84,14 +84,14 @@ class LiveService : Service() {
         }
         server = srv
 
-        // Fuer den Emulator kann die Stream-Adresse von Hand gesetzt werden
-        // (der Sonos erreicht den Emulator nur ueber die Host-Weiterleitung).
+        // For the emulator, the stream address can be set by hand
+        // (the Sonos only reaches the emulator through host port forwarding).
         val base = AppState.streamBaseOverride.value.ifBlank { "http://$ip:${srv.port}" }
         streamUrl = "$base${LiveStreamServer.PATH}"
         AppState.streamUrl.value = streamUrl
 
-        // Alte Meldung jetzt loeschen, nicht erst nach dem Start: die Aufnahme
-        // laeuft in einem eigenen Thread und kann schon vorher scheitern.
+        // Clear the old message now, not after starting: capture runs in its
+        // own thread and can fail before that.
         AppState.message.value = null
         val eng = CaptureEngine(this, srv)
         engine = eng
@@ -114,7 +114,7 @@ class LiveService : Service() {
                 eng.startStandard(proj)
             }
             CaptureMode.ALL_APPS -> {
-                // REMOTE_SUBMIX macht das Handy ohnehin stumm.
+                // REMOTE_SUBMIX mutes the phone anyway.
                 eng.startAllApps()
             }
         }
@@ -137,7 +137,7 @@ class LiveService : Service() {
         val url = streamUrl ?: return
         AppState.scope.launch {
             try {
-                // In einer Gruppe nimmt nur der Koordinator die Quelle an.
+                // In a group, only the coordinator accepts the source.
                 val coordinatorIp = runCatching { Sonos(speaker).coordinatorIp() }.getOrDefault(speaker.ip)
                 val target = Sonos(speaker.copy(ip = coordinatorIp))
                 sonos = target
@@ -150,9 +150,9 @@ class LiveService : Service() {
     }
 
     /**
-     * Haelt die Wiedergabe: wechselt der Sonos die Quelle (etwa aus der
-     * Sonos-App heraus), beenden wir uns; faellt er auf STOPPED, zeigen wir ihn
-     * erneut auf den Stream (wie "Sonos left our stream -> re-pointing").
+     * Keeps playback going: if the Sonos switches source (say, from the Sonos
+     * app), we shut down; if it drops to STOPPED, we point it at the stream
+     * again (like "Sonos left our stream -> re-pointing").
      */
     private fun startWatchdog() {
         handler.postDelayed(object : Runnable {
@@ -166,7 +166,7 @@ class LiveService : Service() {
                             val current = target.currentUri()
                             val state = target.transportState()
                             if (current.isNotEmpty() && current != url) {
-                                // Jemand hat umgeschaltet - Stream beenden.
+                                // Someone switched source: end the stream.
                                 handler.post { stopEverything() }
                             } else if (state == "STOPPED") {
                                 target.playStream(url)
@@ -179,7 +179,7 @@ class LiveService : Service() {
         }, 2500)
     }
 
-    // ---- Projektion -------------------------------------------------------
+    // ---- Projection -------------------------------------------------------
 
     private fun buildProjection(intent: Intent?): MediaProjection? {
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, 0) ?: 0
@@ -193,7 +193,7 @@ class LiveService : Service() {
         return mpm.getMediaProjection(resultCode, data)
     }
 
-    // ---- Lautstaerke des Handys ------------------------------------------
+    // ---- Phone volume -----------------------------------------------------
 
     private fun muteMusicStream() {
         val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -208,7 +208,7 @@ class LiveService : Service() {
         savedMusicVolume = -1
     }
 
-    // ---- Abbau ------------------------------------------------------------
+    // ---- Teardown ---------------------------------------------------------
 
     private fun stopEverything() {
         stopInternals()
@@ -237,16 +237,16 @@ class LiveService : Service() {
         wifiLock = null
     }
 
-    // ---- Vordergrund ------------------------------------------------------
+    // ---- Foreground -------------------------------------------------------
 
     /**
-     * Der Diensttyp muss zur Betriebsart passen. mediaProjection darf nur
-     * gesetzt werden, wenn die Aufnahme-Zustimmung wirklich vorliegt (Standard-
-     * Modus, die Activity hat sie gerade eingeholt). Sonst lehnt Android ab
-     * Android 14 den Start mit einer SecurityException ab ("all of the
-     * permissions [FOREGROUND_SERVICE_MEDIA_PROJECTION] any of
-     * [CAPTURE_VIDEO_OUTPUT, android:project_media]") und die App stuerzt ab.
-     * Im Alle-Apps-Modus gibt es keine Projektion, dort genuegt connectedDevice.
+     * The service type must match the mode. mediaProjection may only be set
+     * when capture consent really exists (Standard mode, the Activity just
+     * obtained it). Otherwise, from Android 14 on, Android rejects the start
+     * with a SecurityException ("all of the permissions
+     * [FOREGROUND_SERVICE_MEDIA_PROJECTION] any of
+     * [CAPTURE_VIDEO_OUTPUT, android:project_media]") and the app crashes.
+     * All apps mode has no projection, so connectedDevice is enough there.
      */
     private fun startInForeground(standard: Boolean) {
         val notification = buildNotification()

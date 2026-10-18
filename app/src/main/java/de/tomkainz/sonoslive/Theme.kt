@@ -15,8 +15,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// Rueckfallfarben, wenn das Geraet keine dynamischen Farben kann (vor Android 12).
-// Teal-Gruen wie Wavelets Standardakzent.
+// Fallback colors when the device does not support dynamic colors (before Android 12).
+// Teal green like Wavelet's default accent.
 private val Accent = Color(0xFF26C6A6)
 
 private val Dark = darkColorScheme(
@@ -59,7 +59,7 @@ private val Light = lightColorScheme(
     onError = Color(0xFFFFFFFF)
 )
 
-// Vier Groessen, zwei Staerken. Rangordnung sonst ueber Groesse und Deckkraft.
+// Four sizes, two weights. Otherwise hierarchy comes from size and opacity.
 private val AppTypography = Typography(
     headlineMedium = TextStyle(fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Normal, letterSpacing = 0.sp),
     titleMedium = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Normal, letterSpacing = 0.sp),
@@ -71,7 +71,7 @@ private val AppTypography = Typography(
 fun SonosLiveTheme(content: @Composable () -> Unit) {
     val dark = isSystemInDarkTheme()
     val context = LocalContext.current
-    // Material You: Farben vom Hintergrundbild uebernehmen, wie Wavelet.
+    // Material You: take colors from the wallpaper, like Wavelet.
     val scheme = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
