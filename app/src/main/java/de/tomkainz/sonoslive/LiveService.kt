@@ -31,6 +31,7 @@ class LiveService : Service() {
     private var engine: CaptureEngine? = null
     private var projection: MediaProjection? = null
     private var wifiLock: WifiManager.WifiLock? = null
+    private var lowLatencyLock: WifiManager.WifiLock? = null
 
     private val handler = Handler(Looper.getMainLooper())
     private var streamUrl: String? = null
@@ -76,7 +77,7 @@ class LiveService : Service() {
             return START_NOT_STICKY
         }
 
-        val ip = Net.localIp(this)
+        val ip = Net.localIp(this, speaker.ip)
         if (ip == null) {
             Diagnose.fail(this, Diagnose.Code.D1)
             stopSelf()
@@ -104,10 +105,13 @@ class LiveService : Service() {
         AppState.message.value = null
         // Only the Sonos speakers may fetch the stream, not every device on the
         // Wi-Fi. With a hand-set address (emulator port forwarding) anyone may.
+        // A Sonos the search did not list (say, a group member that fetches
+        // for the coordinator) is recognised by its device description.
         if (AppState.streamBaseOverride.value.isBlank()) {
             srv.allowPeer = { peer ->
                 peer == "127.0.0.1" || peer == speaker.ip || peer == coordinatorIp ||
-                    AppState.speakers.value.any { it.ip == peer }
+                    AppState.speakers.value.any { it.ip == peer } ||
+                    sonosPeers.getOrPut(peer) { Ssdp.probe(peer) != null }
             }
         }
 
@@ -157,9 +161,22 @@ class LiveService : Service() {
     @Volatile
     private var coordinatorIp: String? = null
 
+    private val sonosPeers = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
+    /**
+     * True while the Sonos is being pointed at the stream or checked. Play can
+     * take many seconds to answer; a second SetAVTransportURI from the
+     * watchdog in that time would restart the speaker's connection attempt.
+     */
+    private val sonosBusy = java.util.concurrent.atomic.AtomicBoolean(false)
+    @Volatile
+    private var repoints = 0
+
     private fun pointSonosAtStream() {
         val speaker = AppState.selected.value ?: return
         val url = streamUrl ?: return
+        val srv = server ?: return
+        sonosBusy.set(true)
         AppState.scope.launch {
             try {
                 // In a group, only the coordinator accepts the source.
@@ -169,10 +186,23 @@ class LiveService : Service() {
                 if (!AppState.running.value) return@launch
                 val target = Sonos(speaker.copy(ip = ip))
                 sonos = target
+                AppState.log("Sonos $ip: play $url")
                 target.playStream(url)
+                AppState.log("Sonos $ip: playing")
                 AppState.refreshVolume()
             } catch (e: Exception) {
-                Diagnose.fail(this@LiveService, Diagnose.Code.D3, e.message, e.stackTraceToString())
+                if (!AppState.running.value) return@launch
+                AppState.log("Sonos: ${e.javaClass.simpleName}: ${e.message}")
+                val requests = srv.streamRequests.get()
+                val refused = synchronized(srv.refusedPeers) { srv.refusedPeers.toList() }
+                val facts = "Stream URL: $url\nStream requests: $requests\n" +
+                    "Refused: ${refused.ifEmpty { listOf("none") }.joinToString()}\n\n" +
+                    e.stackTraceToString()
+                // No request at all: the Sonos could not reach the phone.
+                val code = if (requests == 0) Diagnose.Code.D4 else Diagnose.Code.D3
+                Diagnose.fail(this@LiveService, code, e.message, facts)
+            } finally {
+                sonosBusy.set(false)
             }
         }
     }
@@ -188,9 +218,9 @@ class LiveService : Service() {
                 if (!AppState.running.value) return
                 val target = sonos
                 val url = streamUrl
-                if (target != null && url != null) {
+                if (target != null && url != null && sonosBusy.compareAndSet(false, true)) {
                     AppState.scope.launch {
-                        runCatching {
+                        try {
                             val current = target.currentUri()
                             val state = target.transportState()
                             if (current.isNotEmpty() && current != url) {
@@ -199,8 +229,14 @@ class LiveService : Service() {
                                 sonos = null
                                 handler.post { stopEverything() }
                             } else if (state == "STOPPED") {
+                                // Logged only a few times, so the report keeps the earlier lines.
+                                if (++repoints <= 3) AppState.log("Sonos stopped: pointing it at the stream again")
                                 target.playStream(url)
                             }
+                        } catch (e: Exception) {
+                            // Next round tries again.
+                        } finally {
+                            sonosBusy.set(false)
                         }
                     }
                 }
@@ -264,6 +300,8 @@ class LiveService : Service() {
         AppState.level.value = 0f
         runCatching { if (wifiLock?.isHeld == true) wifiLock?.release() }
         wifiLock = null
+        runCatching { if (lowLatencyLock?.isHeld == true) lowLatencyLock?.release() }
+        lowLatencyLock = null
     }
 
     // ---- Foreground -------------------------------------------------------
@@ -321,10 +359,18 @@ class LiveService : Service() {
         manager.createNotificationChannel(channel)
     }
 
+    /**
+     * Keeps Wi-Fi from dozing between packets. HIGH_PERF no longer has an effect
+     * on newer Android versions; LOW_LATENCY also turns off Wi-Fi power saving,
+     * but Android honours it only while the app is in front and the screen is on.
+     */
+    @Suppress("DEPRECATION")
     private fun acquireWifiLock() {
         if (wifiLock?.isHeld == true) return
         val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
         wifiLock = wifi?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "sonos-live")
+            ?.apply { runCatching { acquire() } }
+        lowLatencyLock = wifi?.createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "sonos-live-low-latency")
             ?.apply { runCatching { acquire() } }
     }
 

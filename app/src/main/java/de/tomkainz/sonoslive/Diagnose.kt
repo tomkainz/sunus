@@ -35,6 +35,7 @@ object Diagnose {
         D1(R.string.code_d1),
         D2(R.string.code_d2),
         D3(R.string.code_d3),
+        D4(R.string.code_d4),
         X1(R.string.code_x1);
 
         val label: String get() = "SL-$name"
@@ -124,9 +125,21 @@ object Diagnose {
             appendLine("Mode:        ${AppState.mode.value}")
             appendLine("ADB paired:  ${AppState.adbPaired.value}")
             appendLine("Speaker:     $speaker")
+            appendLine("Phone IP:    ${Net.localIp(context) ?: "none"}")
+            if (Build.VERSION.SDK_INT >= 37) {
+                val local = context.checkSelfPermission("android.permission.ACCESS_LOCAL_NETWORK") ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+                appendLine("Local network permission: $local")
+            }
             appendLine()
             appendLine("---- Details ----")
             appendLine(details.trim())
+            val log = AppState.requestLog.value
+            if (log.isNotEmpty()) {
+                appendLine()
+                appendLine("---- Recent log (oldest first) ----")
+                log.asReversed().forEach { appendLine(it) }
+            }
         }
     }
 

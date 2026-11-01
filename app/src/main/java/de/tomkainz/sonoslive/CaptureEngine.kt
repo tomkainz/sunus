@@ -75,6 +75,7 @@ class CaptureEngine(
 
     @SuppressLint("MissingPermission")
     private fun runStandard(projection: MediaProjection) {
+        raisePriority()
         try {
             val config = AudioPlaybackCaptureConfiguration.Builder(projection)
                 .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
@@ -123,6 +124,7 @@ class CaptureEngine(
     // ---- All apps (shell helper) -----------------------------------------
 
     private fun runAllApps() {
+        raisePriority()
         var process: AdbManager.ShellProcess? = null
         try {
             AppState.status.value = context.getString(R.string.status_connecting_adb)
@@ -198,6 +200,11 @@ class CaptureEngine(
             }
             if (running) onEnded()
         }
+    }
+
+    /** Audio priority, so the reading thread keeps up when the phone is busy. */
+    private fun raisePriority() {
+        runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) }
     }
 
     /** Reads lines (up to LF), skipping any VM output, until the marker. */

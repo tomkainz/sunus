@@ -65,6 +65,9 @@ object AppState {
     val audioFlowing = MutableStateFlow(false)
     val level = MutableStateFlow(0f)
     val volume = MutableStateFlow<Int?>(null)
+    val muted = MutableStateFlow(false)
+    val eq = MutableStateFlow<Eq?>(null)
+    /** Recent log lines, newest first; they go into the error report. */
     val requestLog = MutableStateFlow<List<String>>(emptyList())
 
     /** For messages from places without their own Context. */
@@ -185,6 +188,39 @@ object AppState {
         val speaker = selected.value ?: return
         scope.launch {
             volume.value = runCatching { Sonos(speaker).volume() }.getOrNull()
+            muted.value = runCatching { Sonos(speaker).muted() }.getOrDefault(false)
+            eq.value = runCatching { Sonos(speaker).eq() }.getOrNull()
+            eqOnSpeaker = eq.value
+        }
+    }
+
+    private var eqJob: Job? = null
+
+    /** What the speaker has, as far as we know; set on load and after sending. */
+    @Volatile
+    private var eqOnSpeaker: Eq? = null
+
+    /**
+     * Like [setVolume]: only the last value of a drag is sent. Only what
+     * differs from the speaker is sent, so a bass drag does not also rewrite
+     * the treble.
+     */
+    fun setEq(value: Eq) {
+        val speaker = selected.value ?: return
+        eq.value = value
+        eqJob?.cancel()
+        eqJob = scope.launch {
+            delay(150)
+            val before = eqOnSpeaker
+            runCatching {
+                val sonos = Sonos(speaker)
+                if (before == null || before.bass != value.bass) sonos.setBass(value.bass)
+                if (before == null || before.treble != value.treble) sonos.setTreble(value.treble)
+                if (before == null || before.loudness != value.loudness) sonos.setLoudness(value.loudness)
+                if (value.night != null && before?.night != value.night) sonos.setNightMode(value.night)
+                if (value.speech != null && before?.speech != value.speech) sonos.setSpeech(value.speech)
+                eqOnSpeaker = value
+            }.onFailure { message.value = text(R.string.msg_eq_error, it.message ?: "") }
         }
     }
 
@@ -201,8 +237,27 @@ object AppState {
         volumeJob?.cancel()
         volumeJob = scope.launch {
             delay(150)
-            runCatching { Sonos(speaker).setVolume(value) }
-                .onFailure { message.value = text(R.string.msg_volume_error, it.message ?: "") }
+            runCatching {
+                val sonos = Sonos(speaker)
+                sonos.setVolume(value)
+                // As in the Sonos app: changing the volume ends muting.
+                if (muted.value) {
+                    sonos.setMuted(false)
+                    muted.value = false
+                }
+            }.onFailure { message.value = text(R.string.msg_volume_error, it.message ?: "") }
+        }
+    }
+
+    fun setMuted(on: Boolean) {
+        val speaker = selected.value ?: return
+        muted.value = on
+        scope.launch {
+            runCatching { Sonos(speaker).setMuted(on) }
+                .onFailure {
+                    muted.value = !on
+                    message.value = text(R.string.msg_volume_error, it.message ?: "")
+                }
         }
     }
 
@@ -211,6 +266,6 @@ object AppState {
     fun log(line: String) {
         val stamped = "${timeFormat.format(Date())}  $line"
         android.util.Log.i("Sunus", line)
-        requestLog.value = (listOf(stamped) + requestLog.value).take(8)
+        requestLog.value = (listOf(stamped) + requestLog.value).take(60)
     }
 }

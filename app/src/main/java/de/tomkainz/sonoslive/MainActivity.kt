@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.service.quicksettings.TileService
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -47,6 +48,8 @@ class MainActivity : ComponentActivity() {
         // The app launches with the black splash screen (Theme.SonosLive.Start).
         setTheme(R.style.Theme_SonosLive)
         super.onCreate(savedInstanceState)
+        // Dark status bar icons in the light theme, light ones in the dark theme.
+        enableEdgeToEdge()
 
         setContent {
             SonosLiveTheme {

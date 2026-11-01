@@ -6,7 +6,7 @@ An Android app that plays your phone's audio live on a Sonos speaker. The phone 
 
 The first Sonos Bridge needed a Linux machine as the Bluetooth receiver. Here the phone does that job itself.
 
-Current release: version 1.0, beta.
+Current release: version 1.5, beta.
 
 ## Built with AI
 
@@ -34,11 +34,15 @@ One-time setup:
 
 The app finds the port itself via mDNS. You enter the code in the notification because Android closes the pairing dialog as soon as you leave Settings. There is no public intent for the Wireless debugging page; the app takes the same route as a long press on the Quick Settings tile. Where that isn't available, Developer options open instead.
 
-During pairing the app uses the shell once to grant itself `WRITE_SECURE_SETTINGS` and the `PROJECT_MEDIA` app op. That lets it turn Wireless debugging back on after a reboot or a Wi-Fi change, as Shizuku has done since version 13.6. It also sets `adb_allowed_connection_time` to 0, so the pairing does not expire after a week without use. That setting applies to every ADB authorization on the phone, including computers; "Revoke USB debugging authorizations" in Developer options still removes them all. Requirements: Developer options stay enabled, and the Wi-Fi network was confirmed once with "Always allow on this network". The app remembers the ADB port. With a known port the connection is up in a fraction of a second; otherwise it searches via mDNS. This mode requires Android 12.
+During pairing the app uses the shell once to grant itself `WRITE_SECURE_SETTINGS` and the `PROJECT_MEDIA` app op. That lets it turn Wireless debugging back on after a reboot or a Wi-Fi change, as Shizuku has done since version 13.6. It also sets `adb_allowed_connection_time` to 0, so the pairing does not expire after a week without use. That setting applies to every ADB authorization on the phone, including computers; "Revoke USB debugging authorizations" in Developer options still removes them all. Requirements: Developer options stay enabled, and the Wi-Fi network was confirmed once with "Always allow on this network". The app remembers the ADB port. With a known port the connection is up in a fraction of a second; otherwise it searches via mDNS and, in parallel, probes the local ports for the ADB service. This mode requires Android 12.
 
 ### Standard
 
 This mode needs no setup. It uses the official `AudioPlaybackCapture` API, and Android asks for consent on every start. Once "All apps" has been set up, that prompt no longer appears. Apps may opt out of this capture; Netflix and Audible do, for example. The phone keeps playing the audio as well. If you don't want that, turn down the phone's media volume; users report that this does not affect the stream to the Sonos.
+
+## Sound settings
+
+Below the volume, the **Equalizer** card adjusts the selected speaker like the Sonos app does: bass and treble from −10 to +10, Loudness, and four presets (Flat, Bass, Warm, Vocal). Home theater speakers such as the Arc, Beam or Ray also get Night Sound and Speech Enhancement; on other speakers these stay hidden. The settings live on the speaker, so they also apply to everything else it plays. Tapping the speaker icon next to the volume slider mutes the speaker.
 
 ## Requirements
 
@@ -75,7 +79,7 @@ AGP 9.3.1, Kotlin Compose plugin 2.4.10, compileSdk 37, minSdk 29.
 
 ## Structure
 
-- `Sonos.kt`: discovery, UPnP control, groups, volume
+- `Sonos.kt`: discovery, UPnP control, groups, volume and sound settings
 - `LiveStreamServer.kt`: WAV stream for any number of clients
 - `CaptureEngine.kt`: capture in both modes
 - `LiveService.kt`: foreground service and connection watchdog
@@ -90,6 +94,7 @@ AGP 9.3.1, Kotlin Compose plugin 2.4.10, compileSdk 37, minSdk 29.
 - Can Spotify be captured in Standard mode?
 - Does the stream stay at full level in Standard mode when the phone's media volume is at zero?
 - The latency is estimated, not measured.
+- Night Sound and Speech Enhancement have only been tried against a simulated speaker, not a real soundbar.
 
 ## License
 

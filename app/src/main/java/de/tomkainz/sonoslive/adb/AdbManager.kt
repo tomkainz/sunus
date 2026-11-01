@@ -9,6 +9,7 @@ import android.provider.Settings
 import de.tomkainz.sonoslive.AppState
 import de.tomkainz.sonoslive.R
 import de.tomkainz.sonoslive.shell.SubmixRecorder
+import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import io.github.muntashirakon.adb.AdbPairingRequiredException
 import io.github.muntashirakon.adb.AdbStream
 import io.github.muntashirakon.adb.android.AdbMdns
@@ -45,6 +46,13 @@ object AdbManager {
 
     /** Without a limit the library waits forever for the answer from adbd. */
     private const val ANSWER_TIMEOUT_MS = 6000L
+
+    private const val LOOPBACK = "127.0.0.1"
+
+    // ADB message commands, little-endian ASCII.
+    private const val A_CNXN = 0x4e584e43
+    private const val A_AUTH = 0x48545541
+    private const val A_STLS = 0x534c5453
 
     /**
      * Pairs using the code from the "Pair device with pairing code" dialog.
@@ -88,14 +96,17 @@ object AdbManager {
         val switchedOn = enableWirelessDebugging(context)
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+        if (switchedOn) AppState.log("ADB: turned on wireless debugging")
         val last = prefs.getInt(KEY_PORT, -1)
         if (!switchedOn && last > 0) {
             val ok = try {
                 manager.connect(hostIp(context), last)
             } catch (e: AdbPairingRequiredException) {
+                AppState.log("ADB: port $last asks for pairing")
                 return false
             } catch (e: Exception) {
-                false // stale port
+                AppState.log("ADB: port $last from last time is stale (${e.javaClass.simpleName})")
+                false
             }
             if (ok) {
                 AppState.log("ADB connected in ${SystemClock.elapsedRealtime() - started} ms (known port)")
@@ -104,40 +115,138 @@ object AdbManager {
         }
 
         // Freshly turned on, the service needs a few seconds before its mDNS announcement.
-        val (host, port) = findPort(context, if (switchedOn) timeoutMs + 7000 else timeoutMs)
+        val (host, port, how) = findPort(context, if (switchedOn) timeoutMs + 7000 else timeoutMs)
             ?: throw IOException(context.getString(R.string.adb_not_found))
         val ok = try {
-            manager.connect(host ?: hostIp(context), port)
+            connectAny(manager, listOfNotNull(host, hostIp(context), LOOPBACK).distinct(), port)
         } catch (e: AdbPairingRequiredException) {
+            AppState.log("ADB: port $port asks for pairing")
             false
         }
         if (ok) {
             prefs.edit().putInt(KEY_PORT, port).apply()
-            AppState.log("ADB connected in ${SystemClock.elapsedRealtime() - started} ms (port searched)")
+            AppState.log("ADB connected in ${SystemClock.elapsedRealtime() - started} ms (port $port, $how)")
         }
         return ok
     }
 
+    /** Tries [port] on each address in turn; the last connection error is thrown. */
+    private fun connectAny(manager: AbsAdbConnectionManager, hosts: List<String>, port: Int): Boolean {
+        var lastError: Exception? = null
+        for (host in hosts) {
+            try {
+                if (manager.connect(host, port)) return true
+            } catch (e: AdbPairingRequiredException) {
+                throw e
+            } catch (e: Exception) {
+                AppState.log("ADB: $host:$port failed (${e.javaClass.simpleName}: ${e.message})")
+                lastError = e
+            }
+        }
+        lastError?.let { throw it }
+        return false
+    }
+
+    private data class Found(val host: String?, val port: Int, val how: String)
+
     /**
-     * Looks for the ADB service via mDNS: wireless debugging (TLS) or, as in
-     * the emulator, classic TCP. Like the library's autoConnect, but returns
-     * the port so it can be kept for next time.
+     * Looks for the ADB service: via mDNS (wireless debugging over TLS or, as
+     * in the emulator, classic TCP) and, at the same time, by scanning the
+     * phone's own ports. mDNS alone is not reliable: on a Pixel with Android 17
+     * it found nothing while wireless debugging was on. Whichever finds the
+     * service first wins.
      */
-    private fun findPort(context: Context, timeoutMs: Long): Pair<String?, Int>? {
-        val found = AtomicReference<Pair<String?, Int>?>()
+    private fun findPort(context: Context, timeoutMs: Long): Found? {
+        val found = AtomicReference<Found?>()
         val latch = CountDownLatch(1)
         val listener = AdbMdns.OnAdbDaemonDiscoveredListener { address, port ->
-            if (port > 0 && found.compareAndSet(null, address?.hostAddress to port)) latch.countDown()
+            if (port > 0 && found.compareAndSet(null, Found(address?.hostAddress, port, "mDNS"))) {
+                latch.countDown()
+            }
         }
         val searches = listOf(AdbMdns.SERVICE_TYPE_TLS_CONNECT, AdbMdns.SERVICE_TYPE_ADB)
             .map { AdbMdns(context, it, listener).apply { start() } }
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs
+        val scanner = Thread({
+            // Repeated: right after being turned on, adbd may not listen yet.
+            while (found.get() == null && SystemClock.elapsedRealtime() < deadline) {
+                // Interrupted once the search is over; must not end up as an app crash.
+                val port = runCatching { scanLocalPorts { found.get() != null } }.getOrNull()
+                if (port != null) {
+                    if (found.compareAndSet(null, Found(null, port, "port scan"))) latch.countDown()
+                    break
+                }
+                runCatching { Thread.sleep(500) }
+            }
+        }, "adb-port-scan").apply { isDaemon = true; start() }
         try {
             latch.await(timeoutMs, TimeUnit.MILLISECONDS)
         } finally {
             searches.forEach { it.stop() }
+            scanner.interrupt()
         }
+        if (found.get() == null) AppState.log("ADB: neither mDNS nor the port scan found the service")
         return found.get()
     }
+
+    /**
+     * Finds adbd among the open ports of this phone. Wireless debugging listens
+     * on a random port from the kernel's ephemeral range, on all interfaces,
+     * so on 127.0.0.1 too. Closed ports refuse at once; every open one is
+     * asked with an ADB CONNECT, and only adbd answers that with STLS, AUTH
+     * or CNXN. 5555 is the classic port (emulator, "adb tcpip").
+     */
+    private fun scanLocalPorts(cancelled: () -> Boolean): Int? {
+        val range = ephemeralRange()
+        val ports = listOf(5555) + range.filter { it != 5555 }
+        val open = java.util.concurrent.ConcurrentLinkedQueue<Int>()
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(32)
+        try {
+            ports.chunked(ports.size / 32 + 1).forEach { chunk ->
+                pool.execute {
+                    for (port in chunk) {
+                        if (cancelled() || Thread.currentThread().isInterrupted) return@execute
+                        runCatching {
+                            java.net.Socket().use {
+                                it.connect(java.net.InetSocketAddress(LOOPBACK, port), 200)
+                            }
+                            open += port
+                        }
+                    }
+                }
+            }
+            pool.shutdown()
+            pool.awaitTermination(15, TimeUnit.SECONDS)
+        } finally {
+            pool.shutdownNow()
+        }
+        return open.sorted().firstOrNull { !cancelled() && isAdbd(it) }
+    }
+
+    /** The kernel's range for random ports, as adbd gets one; Linux default otherwise. */
+    private fun ephemeralRange(): IntRange = runCatching {
+        val (low, high) = java.io.File("/proc/sys/net/ipv4/ip_local_port_range").readText()
+            .trim().split(Regex("\\s+")).map { it.toInt() }
+        low..high
+    }.getOrDefault(32768..60999)
+
+    /** Sends an ADB CONNECT message and checks whether the answer is from adbd. */
+    private fun isAdbd(port: Int): Boolean = runCatching {
+        java.net.Socket().use { socket ->
+            socket.connect(java.net.InetSocketAddress(LOOPBACK, port), 500)
+            socket.soTimeout = 1500
+            val payload = "host::\u0000".toByteArray(Charsets.US_ASCII)
+            val header = java.nio.ByteBuffer.allocate(24).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                .putInt(A_CNXN).putInt(0x01000001).putInt(256 * 1024)
+                .putInt(payload.size).putInt(payload.sumOf { it.toInt() and 0xFF })
+                .putInt(A_CNXN xor -1)
+            socket.getOutputStream().apply { write(header.array()); write(payload); flush() }
+            val answer = ByteArray(4)
+            java.io.DataInputStream(socket.getInputStream()).readFully(answer)
+            val command = java.nio.ByteBuffer.wrap(answer).order(java.nio.ByteOrder.LITTLE_ENDIAN).int
+            command == A_STLS || command == A_AUTH || command == A_CNXN
+        }
+    }.getOrDefault(false)
 
     /**
      * What the app needs from the shell only once, and never again after that:

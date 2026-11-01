@@ -28,6 +28,10 @@ import kotlin.math.abs
  * - Every new client first gets the last [BURST_SECONDS] as a buffer.
  * - If no audio arrives for longer than [SILENCE_GRACE_MS], silence is fed in
  *   at real-time pace. That keeps the Sonos connected even when nothing plays.
+ *   The grace is long on purpose: in All apps mode the audio travels through
+ *   the ADB connection, which can stall for a few hundred milliseconds. The
+ *   Sonos buffers far more than that, so a short stall is inaudible, while
+ *   silence fed in during it would cut a hole into the music.
  * - A client that cannot keep up loses old data instead of holding up the
  *   capture.
  */
@@ -42,7 +46,7 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
         private const val TICK_MS = 20L
         private const val TICK_BYTES = (BYTES_PER_SEC * TICK_MS / 1000).toInt()
         private const val BURST_SECONDS = 0.4
-        private const val SILENCE_GRACE_MS = 250L
+        private const val SILENCE_GRACE_MS = 1500L
         private const val CLIENT_QUEUE = 256 // about 5 s, then data is dropped
         private const val MAX_STREAMS = 4
         private const val MAX_CONNECTIONS = 16
@@ -76,6 +80,10 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
     @Volatile
     var allowPeer: (String) -> Boolean = { true }
 
+    /** Requests for the stream so far, allowed or not; for error reports. */
+    val streamRequests = AtomicInteger()
+    val refusedPeers: MutableSet<String> = Collections.synchronizedSet(LinkedHashSet())
+
     private val live = ArrayBlockingQueue<ByteArray>(512)
     private var remainder = ByteArray(0)
 
@@ -86,6 +94,14 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
 
     @Volatile
     var drops = 0L
+        private set
+
+    /** How often silence had to be fed in while streaming, and the longest wait for audio. */
+    @Volatile
+    var gaps = 0L
+        private set
+    @Volatile
+    var maxWaitMs = 0L
         private set
 
     private class Client(val socket: Socket, val peer: String) {
@@ -150,11 +166,14 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
     // ---- Clock ------------------------------------------------------------
 
     private fun pumpLoop() {
+        runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) }
         val silence = ByteArray(TICK_BYTES)
         var filling = false
         var nextSilence = 0L
         var lastLevelUpdate = 0L
         var peak = 0
+        var lastData = 0L
+        var fillStart = 0L
         while (running) {
             val timeout = if (filling) {
                 (nextSilence - System.nanoTime() / 1_000_000).coerceAtLeast(0)
@@ -168,14 +187,21 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
             if (data == null) {
                 if (!filling) {
                     filling = true
+                    fillStart = now
                     nextSilence = now
                     AppState.audioFlowing.value = false
+                    if (lastData > 0) gaps++
                 }
                 broadcast(silence)
                 nextSilence += TICK_MS
                 if (nextSilence < now) nextSilence = now + TICK_MS
                 peak = 0
             } else {
+                if (lastData > 0) maxWaitMs = maxOf(maxWaitMs, now - lastData)
+                if (filling && lastData > 0) {
+                    AppState.log("Audio paused ${now - fillStart + SILENCE_GRACE_MS} ms, silence fed in")
+                }
+                lastData = now
                 filling = false
                 AppState.audioFlowing.value = true
                 broadcast(data)
@@ -273,7 +299,10 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
 
             when (path) {
                 PATH -> {
+                    streamRequests.incrementAndGet()
                     if (!allowPeer(peer)) {
+                        refusedPeers += peer
+                        AppState.log("$peer  refused (403): not a known Sonos")
                         head(out, 403, "text/plain", 0)
                         return
                     }
@@ -287,7 +316,8 @@ class LiveStreamServer(private val preferredPort: Int = 8090) {
                 }
                 "/healthz" -> {
                     val body = ("{\"ok\":true,\"port\":$port,\"clients\":${clients.size}," +
-                        "\"live\":${AppState.audioFlowing.value},\"drops\":$drops}").toByteArray()
+                        "\"live\":${AppState.audioFlowing.value},\"drops\":$drops," +
+                        "\"gaps\":$gaps,\"maxWaitMs\":$maxWaitMs}").toByteArray()
                     head(out, 200, "application/json", body.size.toLong())
                     if (method != "HEAD") out.write(body)
                 }

@@ -33,6 +33,28 @@
     <string name="msg_no_speaker">Kein Lautsprecher gewählt.</string>
     <string name="msg_no_sonos_at">Unter %1$s antwortet kein Sonos.</string>
     <string name="msg_volume_error">Lautstärke: %1$s</string>
+    <string name="msg_eq_error">Klang: %1$s</string>
+    <string name="section_speaker">Lautsprecher</string>
+    <string name="section_source">Quelle</string>
+    <string name="section_sound">Klang</string>
+    <string name="volume_mute">Stummschalten</string>
+    <string name="volume_unmute">Ton an</string>
+    <string name="eq_title">Equalizer</string>
+    <string name="eq_summary">Bass %1$s · Höhen %2$s</string>
+    <string name="eq_flat">Neutral</string>
+    <string name="eq_preset_bass">Bass</string>
+    <string name="eq_preset_warm">Warm</string>
+    <string name="eq_preset_vocal">Stimme</string>
+    <string name="eq_bass">Bass</string>
+    <string name="eq_treble">Höhen</string>
+    <string name="eq_loudness">Loudness</string>
+    <string name="eq_loudness_hint">Voller Klang bei geringer Lautstärke</string>
+    <string name="eq_night">Nachtmodus</string>
+    <string name="eq_night_hint">Leise Stellen lauter, laute leiser</string>
+    <string name="eq_speech">Sprachverbesserung</string>
+    <string name="eq_speech_hint">Stimmen deutlicher</string>
+    <string name="eq_night_short">Nacht</string>
+    <string name="eq_speech_short">Sprache</string>
 
     <!-- Mehr -->
     <string name="more_ip">Lautsprecher per IP</string>
@@ -101,6 +123,7 @@
     <string name="code_d1">Keine WLAN-Adresse. Ist das Handy im WLAN?</string>
     <string name="code_d2">Stream-Server startet nicht.</string>
     <string name="code_d3">Der Sonos nimmt den Stream nicht an.</string>
+    <string name="code_d4">Der Sonos erreicht den Stream auf dem Handy nicht. Sind beide im selben Netz (kein Gast-WLAN, kein VPN)?</string>
     <string name="code_x1">Die App ist abgestürzt.</string>
     <string name="report_share_title">Fehlerbericht teilen</string>
     <string name="report_saved">Gespeichert unter Downloads/%1$s</string>

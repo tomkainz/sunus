@@ -15,6 +15,18 @@ import java.util.Collections
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
+/**
+ * The speaker's sound settings. Night mode and speech enhancement only exist
+ * on home theater speakers (Arc, Beam, Ray); elsewhere they are null.
+ */
+data class Eq(
+    val bass: Int,
+    val treble: Int,
+    val loudness: Boolean,
+    val night: Boolean? = null,
+    val speech: Boolean? = null
+)
+
 data class Speaker(
     val room: String,
     val ip: String,
@@ -171,6 +183,8 @@ class Sonos(val speaker: Speaker) {
         private const val AVT_PATH = "/MediaRenderer/AVTransport/Control"
         private const val RC_PATH = "/MediaRenderer/RenderingControl/Control"
         private const val ZGT_PATH = "/ZoneGroupTopology/Control"
+        private const val NIGHT_MODE = "NightMode"
+        private const val DIALOG_LEVEL = "DialogLevel"
 
         fun esc(s: String): String = s
             .replace("&", "&amp;")
@@ -201,10 +215,19 @@ class Sonos(val speaker: Speaker) {
                 "<CurrentURI>${esc(url)}</CurrentURI>" +
                 "<CurrentURIMetaData></CurrentURIMetaData>"
         )
-        play()
+        try {
+            play()
+        } catch (e: SocketTimeoutException) {
+            // For a stream, the Sonos only answers Play once it has opened the
+            // URL and buffered; that can take longer than the timeout. If it
+            // is playing by now, that is fine.
+            val state = runCatching { transportState() }.getOrDefault("")
+            if (state != "PLAYING" && state != "TRANSITIONING") throw e
+        }
     }
 
-    fun play() = avt("Play", "<InstanceID>0</InstanceID><Speed>1</Speed>").let { }
+    fun play() = soap(AVT, AVT_PATH, "Play", "<InstanceID>0</InstanceID><Speed>1</Speed>", readTimeoutMs = 20_000)
+        .let { }
     fun pause() = avt("Pause", "<InstanceID>0</InstanceID>").let { }
     fun stop() = avt("Stop", "<InstanceID>0</InstanceID>").let { }
 
@@ -253,12 +276,65 @@ class Sonos(val speaker: Speaker) {
             "<DesiredVolume>${v.coerceIn(0, 100)}</DesiredVolume>"
     ).let { }
 
+    fun muted(): Boolean =
+        value(rc("GetMute", "<InstanceID>0</InstanceID><Channel>Master</Channel>"), "CurrentMute") == "1"
+
+    fun setMuted(on: Boolean) = rc(
+        "SetMute",
+        "<InstanceID>0</InstanceID><Channel>Master</Channel>" +
+            "<DesiredMute>${if (on) 1 else 0}</DesiredMute>"
+    ).let { }
+
+    // ---- Sound (EQ) -------------------------------------------------------
+
+    /** Bass and treble from -10 to +10, as in the Sonos app. */
+    fun eq(): Eq = Eq(
+        bass = value(rc("GetBass", "<InstanceID>0</InstanceID>"), "CurrentBass")?.toIntOrNull() ?: 0,
+        treble = value(rc("GetTreble", "<InstanceID>0</InstanceID>"), "CurrentTreble")?.toIntOrNull() ?: 0,
+        loudness = value(
+            rc("GetLoudness", "<InstanceID>0</InstanceID><Channel>Master</Channel>"), "CurrentLoudness"
+        ) == "1",
+        night = homeTheater(NIGHT_MODE),
+        speech = homeTheater(DIALOG_LEVEL)
+    )
+
+    /** Other speakers answer GetEQ with UPnP error 402 (checked on a Play:1). */
+    private fun homeTheater(type: String): Boolean? = runCatching {
+        value(rc("GetEQ", "<InstanceID>0</InstanceID><EQType>$type</EQType>"), "CurrentValue")?.let { it == "1" }
+    }.getOrNull()
+
+    fun setNightMode(on: Boolean) = setHomeTheater(NIGHT_MODE, on)
+    fun setSpeech(on: Boolean) = setHomeTheater(DIALOG_LEVEL, on)
+
+    private fun setHomeTheater(type: String, on: Boolean) = rc(
+        "SetEQ",
+        "<InstanceID>0</InstanceID><EQType>$type</EQType><DesiredValue>${if (on) 1 else 0}</DesiredValue>"
+    ).let { }
+
+    fun setBass(v: Int) =
+        rc("SetBass", "<InstanceID>0</InstanceID><DesiredBass>${v.coerceIn(-10, 10)}</DesiredBass>").let { }
+
+    fun setTreble(v: Int) =
+        rc("SetTreble", "<InstanceID>0</InstanceID><DesiredTreble>${v.coerceIn(-10, 10)}</DesiredTreble>").let { }
+
+    fun setLoudness(on: Boolean) = rc(
+        "SetLoudness",
+        "<InstanceID>0</InstanceID><Channel>Master</Channel>" +
+            "<DesiredLoudness>${if (on) 1 else 0}</DesiredLoudness>"
+    ).let { }
+
     // ---- SOAP -------------------------------------------------------------
 
     private fun avt(action: String, body: String) = soap(AVT, AVT_PATH, action, body)
     private fun rc(action: String, body: String) = soap(RC, RC_PATH, action, body)
 
-    private fun soap(service: String, path: String, action: String, body: String): String {
+    private fun soap(
+        service: String,
+        path: String,
+        action: String,
+        body: String,
+        readTimeoutMs: Int = 8000
+    ): String {
         val envelope =
             "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
                 "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" " +
@@ -270,7 +346,7 @@ class Sonos(val speaker: Speaker) {
             setRequestProperty("Content-Type", "text/xml; charset=\"utf-8\"")
             setRequestProperty("SOAPACTION", "\"$service#$action\"")
             connectTimeout = 4000
-            readTimeout = 8000
+            readTimeout = readTimeoutMs
             doOutput = true
         }
         try {

@@ -52,6 +52,7 @@ public final class SubmixRecorder {
             Looper.prepareMainLooper();
             ShellRuntime.apply();
 
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO);
             recorder = create();
             recorder.startRecording();
             if (recorder.getRecordingState() != AudioRecord.RECORDSTATE_RECORDING) {

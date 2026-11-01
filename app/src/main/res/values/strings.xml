@@ -34,6 +34,28 @@
     <string name="msg_no_speaker">No speaker selected.</string>
     <string name="msg_no_sonos_at">No Sonos answers at %1$s.</string>
     <string name="msg_volume_error">Volume: %1$s</string>
+    <string name="msg_eq_error">Sound: %1$s</string>
+    <string name="section_speaker">Speaker</string>
+    <string name="section_source">Source</string>
+    <string name="section_sound">Sound</string>
+    <string name="volume_mute">Mute</string>
+    <string name="volume_unmute">Unmute</string>
+    <string name="eq_title">Equalizer</string>
+    <string name="eq_summary">Bass %1$s · Treble %2$s</string>
+    <string name="eq_flat">Flat</string>
+    <string name="eq_preset_bass">Bass</string>
+    <string name="eq_preset_warm">Warm</string>
+    <string name="eq_preset_vocal">Vocal</string>
+    <string name="eq_bass">Bass</string>
+    <string name="eq_treble">Treble</string>
+    <string name="eq_loudness">Loudness</string>
+    <string name="eq_loudness_hint">Fuller sound at low volume</string>
+    <string name="eq_night">Night Sound</string>
+    <string name="eq_night_hint">Quiet parts louder, loud parts quieter</string>
+    <string name="eq_speech">Speech Enhancement</string>
+    <string name="eq_speech_hint">Clearer voices</string>
+    <string name="eq_night_short">Night</string>
+    <string name="eq_speech_short">Speech</string>
 
     <!-- More -->
     <string name="more_ip">Speaker by IP</string>
@@ -102,6 +124,7 @@
     <string name="code_d1">No Wi-Fi address. Is the phone on Wi-Fi?</string>
     <string name="code_d2">Stream server does not start.</string>
     <string name="code_d3">The Sonos does not accept the stream.</string>
+    <string name="code_d4">The Sonos can\'t reach the stream on the phone. Are both on the same network (no guest Wi-Fi, no VPN)?</string>
     <string name="code_x1">The app crashed.</string>
     <string name="report_share_title">Share error report</string>
     <string name="report_saved">Saved to Downloads/%1$s</string>
