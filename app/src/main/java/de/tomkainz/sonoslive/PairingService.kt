@@ -82,7 +82,6 @@ class PairingService : Service() {
 
         createChannel()
         getSystemService(NotificationManager::class.java).cancel(RESULT_ID)
-        intent?.getIntExtra(EXTRA_PORT, -1)?.takeIf { it > 0 }?.let { port = it }
         startForeground(
             NOTIFICATION_ID,
             notification(getString(R.string.pair_notif_open), withInput = true),
@@ -122,46 +121,72 @@ class PairingService : Service() {
     }
 
     private fun onCode(intent: Intent) {
-        val code = RemoteInput.getResultsFromIntent(intent)
-            ?.getCharSequence(KEY_CODE)?.toString()?.filter { it.isDigit() } ?: ""
-        if (code.length != 6) {
+        val text = RemoteInput.getResultsFromIntent(intent)?.getCharSequence(KEY_CODE)?.toString().orEmpty()
+        val input = PairingInput.parse(text)
+        if (input == null) {
             update(getString(R.string.pair_digits_notif), withInput = true)
             AppState.adbMessage.value = getString(R.string.pair_digits)
             return
         }
         if (busy) return
         busy = true
+        // A port typed in by hand wins over whatever the search found.
+        input.port?.let {
+            host = null
+            port = it
+        }
+        val code = input.code
         update(getString(R.string.pair_pairing), withInput = false)
         AppState.adbMessage.value = getString(R.string.pair_pairing)
 
         AppState.scope.launch {
             // If the code arrived before the search finished, wait briefly for the port.
             var waited = 0
-            while (port <= 0 && waited < 15_000) {
+            while (port <= 0 && waited < MDNS_WAIT_MS) {
                 delay(250)
                 waited += 250
             }
             if (port <= 0) {
-                busy = false
-                update(getString(R.string.pair_no_dialog_notif), withInput = true)
-                AppState.adbMessage.value = getString(R.string.pair_no_dialog)
-                return@launch
-            }
-
-            val paired = try {
-                AdbManager.pair(this@PairingService, host, port, code)
-            } catch (e: Exception) {
-                false
-            }
-            if (!paired) {
-                busy = false
-                update(getString(R.string.pair_failed_notif), withInput = true)
-                AppState.adbMessage.value = getString(R.string.pair_failed)
-                return@launch
+                // mDNS is not reliable on every phone: look at the open ports instead.
+                AppState.log("Pairing: mDNS found no dialog, scanning local ports")
+                if (!AdbManager.pairByScan(this@PairingService, code)) {
+                    busy = false
+                    update(getString(R.string.pair_no_dialog_notif), withInput = true)
+                    AppState.adbMessage.value = getString(R.string.pair_no_dialog)
+                    return@launch
+                }
+            } else {
+                val paired = try {
+                    AdbManager.pair(this@PairingService, host, port, code)
+                } catch (e: Exception) {
+                    AppState.log("Pairing failed on port $port (${e.javaClass.simpleName}: ${e.message})")
+                    false
+                }
+                if (!paired) {
+                    busy = false
+                    update(getString(R.string.pair_failed_notif), withInput = true)
+                    AppState.adbMessage.value = getString(R.string.pair_failed)
+                    return@launch
+                }
             }
 
             update(getString(R.string.pair_connecting), withInput = false)
-            val connected = runCatching { AdbManager.connect(this@PairingService) }.getOrDefault(false)
+            var connection = runCatching { AdbManager.connect(this@PairingService) }
+            if (connection.getOrNull() == false) {
+                delay(1000)
+                connection = runCatching { AdbManager.connect(this@PairingService) }
+            }
+            // false: the phone refuses this app although pairing succeeded. Do not
+            // report it as set up. An exception only means the service was not found
+            // right now; the pairing stays valid and the next start connects.
+            if (connection.getOrNull() == false) {
+                AppState.setAdbPaired(false)
+                busy = false
+                update(getString(R.string.pair_rejected), withInput = true)
+                AppState.adbMessage.value = getString(R.string.pair_rejected)
+                return@launch
+            }
+            val connected = connection.getOrNull() == true
             AppState.setAdbPaired(true)
             AppState.requestPairing.value = false
             if (connected) {
@@ -264,15 +289,13 @@ class PairingService : Service() {
         private const val ACTION_CODE = "de.tomkainz.sonoslive.PAIR_CODE"
         private const val ACTION_CANCEL = "de.tomkainz.sonoslive.PAIR_CANCEL"
         private const val ACTION_DISMISSED = "de.tomkainz.sonoslive.PAIR_DISMISSED"
-        private const val EXTRA_PORT = "port"
+        private const val MDNS_WAIT_MS = 5_000
         private const val TIMEOUT_MS = 5 * 60_000L
         private val TIMEOUT_TOKEN = Any()
 
-        /** Starts pairing; [manualPort] only if the search on the Wi-Fi fails. */
-        fun start(context: Context, manualPort: Int? = null) {
-            val intent = Intent(context, PairingService::class.java)
-            manualPort?.let { intent.putExtra(EXTRA_PORT, it) }
-            context.startForegroundService(intent)
+        /** Starts pairing. */
+        fun start(context: Context) {
+            context.startForegroundService(Intent(context, PairingService::class.java))
         }
     }
 }

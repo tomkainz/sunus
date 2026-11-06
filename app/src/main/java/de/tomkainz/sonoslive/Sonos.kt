@@ -159,8 +159,7 @@ object Ssdp {
     fun visibleOnly(list: List<Speaker>): List<Speaker> {
         val first = list.firstOrNull() ?: return list
         val topology = runCatching { Sonos(first).zoneGroupState() }.getOrNull() ?: return list
-        val hidden = Regex("<ZoneGroupMember[^>]*UUID=\"([^\"]+)\"[^>]*Invisible=\"1\"")
-            .findAll(topology).map { it.groupValues[1] }.toSet()
+        val hidden = Sonos.hiddenUdns(topology)
         return list.filterNot { it.udn in hidden }
     }
 
@@ -199,6 +198,31 @@ class Sonos(val speaker: Speaker) {
             .replace("&quot;", "\"")
             .replace("&apos;", "'")
             .replace("&amp;", "&")
+
+        /** Speakers that cannot play on their own (second of a stereo pair, Sub). */
+        fun hiddenUdns(topology: String): Set<String> =
+            Regex("<ZoneGroupMember[^>]*UUID=\"([^\"]+)\"[^>]*Invisible=\"1\"")
+                .findAll(topology).map { it.groupValues[1] }.toSet()
+
+        /** The IP of the coordinator of [speaker]'s group, read from the topology. */
+        fun coordinatorIp(state: String, speaker: Speaker): String {
+            val groups = Regex("<ZoneGroup [^>]*Coordinator=\"([^\"]+)\"[^>]*>(.*?)</ZoneGroup>",
+                RegexOption.DOT_MATCHES_ALL).findAll(state)
+            for (group in groups) {
+                val members = group.groupValues[2]
+                if (!members.contains("UUID=\"${speaker.udn}\"")) continue
+                val coordinator = group.groupValues[1]
+                if (coordinator == speaker.udn) return speaker.ip
+                val location = Regex("<ZoneGroupMember[^>]*UUID=\"$coordinator\"[^>]*Location=\"http://([^:/\"]+)")
+                    .find(members)?.groupValues?.get(1)
+                return location ?: speaker.ip
+            }
+            return speaker.ip
+        }
+
+        fun xmlValue(xml: String, tag: String): String? =
+            Regex("<$tag>(.*?)</$tag>", RegexOption.DOT_MATCHES_ALL)
+                .find(xml)?.groupValues?.get(1)?.trim()
     }
 
     // ---- Playback ---------------------------------------------------------
@@ -250,18 +274,7 @@ class Sonos(val speaker: Speaker) {
      */
     fun coordinatorIp(): String {
         val state = runCatching { zoneGroupState() }.getOrNull() ?: return speaker.ip
-        val groups = Regex("<ZoneGroup [^>]*Coordinator=\"([^\"]+)\"[^>]*>(.*?)</ZoneGroup>",
-            RegexOption.DOT_MATCHES_ALL).findAll(state)
-        for (group in groups) {
-            val members = group.groupValues[2]
-            if (!members.contains("UUID=\"${speaker.udn}\"")) continue
-            val coordinator = group.groupValues[1]
-            if (coordinator == speaker.udn) return speaker.ip
-            val location = Regex("<ZoneGroupMember[^>]*UUID=\"$coordinator\"[^>]*Location=\"http://([^:/\"]+)")
-                .find(members)?.groupValues?.get(1)
-            return location ?: speaker.ip
-        }
-        return speaker.ip
+        return coordinatorIp(state, speaker)
     }
 
     // ---- Volume -----------------------------------------------------------
@@ -363,9 +376,7 @@ class Sonos(val speaker: Speaker) {
         }
     }
 
-    private fun value(xml: String, tag: String): String? =
-        Regex("<$tag>(.*?)</$tag>", RegexOption.DOT_MATCHES_ALL)
-            .find(xml)?.groupValues?.get(1)?.trim()
+    private fun value(xml: String, tag: String): String? = xmlValue(xml, tag)
 
     private fun errorText(xml: String): String =
         value(xml, "errorDescription") ?: value(xml, "errorCode")?.let { "(UPnP error $it)" } ?: ""

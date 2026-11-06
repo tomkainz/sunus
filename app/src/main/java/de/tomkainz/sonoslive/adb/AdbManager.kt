@@ -48,6 +48,9 @@ object AdbManager {
     private const val ANSWER_TIMEOUT_MS = 6000L
 
     private const val LOOPBACK = "127.0.0.1"
+    private const val CLASSIC_PORT = 5555
+    private const val MAX_PAIR_CANDIDATES = 8
+    private const val PAIR_ATTEMPT_MS = 5000L
 
     // ADB message commands, little-endian ASCII.
     private const val A_CNXN = 0x4e584e43
@@ -196,9 +199,41 @@ object AdbManager {
      * asked with an ADB CONNECT, and only adbd answers that with STLS, AUTH
      * or CNXN. 5555 is the classic port (emulator, "adb tcpip").
      */
-    private fun scanLocalPorts(cancelled: () -> Boolean): Int? {
+    private fun scanLocalPorts(cancelled: () -> Boolean): Int? =
+        openLocalPorts(cancelled).firstOrNull { !cancelled() && isAdbd(it) }
+
+    /**
+     * Pairing without knowing the port, for phones where mDNS finds nothing. The
+     * pairing dialog listens on a random port too, but unlike adbd it does not
+     * answer an ADB CONNECT. So every other open port is a candidate; the pairing
+     * protocol never sends the code itself, a foreign service just fails the attempt.
+     */
+    fun pairByScan(context: Context, code: String): Boolean {
+        val candidates = openLocalPorts { false }
+            .filterNot { it == CLASSIC_PORT || isAdbd(it) }
+            .take(MAX_PAIR_CANDIDATES)
+        AppState.log("ADB pairing: port scan found ${candidates.size} candidate(s)")
+        return candidates.any { port ->
+            pairWithTimeout(context, port, code).also { ok ->
+                if (ok) AppState.log("ADB paired on port $port (port scan)")
+            }
+        }
+    }
+
+    /** A foreign service may simply never answer, and the library would wait forever. */
+    private fun pairWithTimeout(context: Context, port: Int, code: String): Boolean {
+        val result = java.util.concurrent.atomic.AtomicBoolean(false)
+        val attempt = Thread({
+            runCatching { if (pair(context, LOOPBACK, port, code)) result.set(true) }
+        }, "adb-pair-attempt").apply { isDaemon = true; start() }
+        attempt.join(PAIR_ATTEMPT_MS)
+        attempt.interrupt()
+        return result.get()
+    }
+
+    private fun openLocalPorts(cancelled: () -> Boolean): List<Int> {
         val range = ephemeralRange()
-        val ports = listOf(5555) + range.filter { it != 5555 }
+        val ports = listOf(CLASSIC_PORT) + range.filter { it != CLASSIC_PORT }
         val open = java.util.concurrent.ConcurrentLinkedQueue<Int>()
         val pool = java.util.concurrent.Executors.newFixedThreadPool(32)
         try {
@@ -220,7 +255,7 @@ object AdbManager {
         } finally {
             pool.shutdownNow()
         }
-        return open.sorted().firstOrNull { !cancelled() && isAdbd(it) }
+        return open.sorted()
     }
 
     /** The kernel's range for random ports, as adbd gets one; Linux default otherwise. */

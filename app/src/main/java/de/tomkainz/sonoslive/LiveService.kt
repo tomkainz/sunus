@@ -109,7 +109,7 @@ class LiveService : Service() {
         // for the coordinator) is recognised by its device description.
         if (AppState.streamBaseOverride.value.isBlank()) {
             srv.allowPeer = { peer ->
-                peer == "127.0.0.1" || peer == speaker.ip || peer == coordinatorIp ||
+                peer == speaker.ip || peer == coordinatorIp ||
                     AppState.speakers.value.any { it.ip == peer } ||
                     sonosPeers.getOrPut(peer) { Ssdp.probe(peer) != null }
             }
@@ -198,8 +198,7 @@ class LiveService : Service() {
                 val facts = "Stream URL: $url\nStream requests: $requests\n" +
                     "Refused: ${refused.ifEmpty { listOf("none") }.joinToString()}\n\n" +
                     e.stackTraceToString()
-                // No request at all: the Sonos could not reach the phone.
-                val code = if (requests == 0) Diagnose.Code.D4 else Diagnose.Code.D3
+                val code = Diagnose.Code.forSpeakerFailure(e, requests)
                 Diagnose.fail(this@LiveService, code, e.message, facts)
             } finally {
                 sonosBusy.set(false)

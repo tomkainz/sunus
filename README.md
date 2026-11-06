@@ -32,7 +32,7 @@ One-time setup:
 2. Turn it on and tap **Pair device with pairing code**.
 3. Leave the dialog open, pull down the notification shade and enter the 6-digit code in the **Pair Sunus** notification.
 
-The app finds the port itself via mDNS. You enter the code in the notification because Android closes the pairing dialog as soon as you leave Settings. There is no public intent for the Wireless debugging page; the app takes the same route as a long press on the Quick Settings tile. Where that isn't available, Developer options open instead.
+The app finds the port itself via mDNS and, if that fails, by scanning the phone's own ports. If neither works, the notification asks for the code and the port shown in the dialog together, for example `123456 37123`. You enter the code in the notification because Android closes the pairing dialog as soon as you leave Settings. There is no public intent for the Wireless debugging page; the app takes the same route as a long press on the Quick Settings tile. Where that isn't available, Developer options open instead.
 
 During pairing the app uses the shell once to grant itself `WRITE_SECURE_SETTINGS` and the `PROJECT_MEDIA` app op. That lets it turn Wireless debugging back on after a reboot or a Wi-Fi change, as Shizuku has done since version 13.6. It also sets `adb_allowed_connection_time` to 0, so the pairing does not expire after a week without use. That setting applies to every ADB authorization on the phone, including computers; "Revoke USB debugging authorizations" in Developer options still removes them all. Requirements: Developer options stay enabled, and the Wi-Fi network was confirmed once with "Always allow on this network". The app remembers the ADB port. With a known port the connection is up in a fraction of a second; otherwise it searches via mDNS and, in parallel, probes the local ports for the ADB service. This mode requires Android 12.
 
@@ -53,6 +53,15 @@ Below the volume, the **Equalizer** card adjusts the selected speaker like the S
 
 Tested with Android 17 and a Sonos Play:1 running S2 software.
 
+## Compatibility
+
+| Speaker | Android | Status |
+|---|---|---|
+| Play:1 (S2) | 17 | Works, used by the author |
+| Arc Ultra, One SL | 16 | The stream did not start on 1.0 Beta ([#1](https://github.com/tomkainz/sunus/issues/1)). 1.5 Beta has a fix that no user has confirmed yet |
+
+Tried it on another speaker or phone? Please open an issue, whether it worked or not.
+
 ## Latency
 
 The stream is lossless but reaches the speaker an estimated one to three seconds late, most of it probably buffered by the Sonos itself. That is fine for music. With video, picture and sound drift apart.
@@ -72,6 +81,8 @@ You need JDK 21 and the Android SDK with platform 37. Set the SDK path via `ANDR
 ```
 gradlew.bat assembleRelease
 ```
+
+On Linux and macOS, use `./gradlew` instead of `gradlew.bat`. `testDebugUnitTest` runs the unit tests.
 
 Release builds are signed with `keystore/sonoslive.jks`, whose password is read from `sunus.keystore.password` in `local.properties`. Neither is in the repository; without them, `gradlew.bat assembleDebug` produces an installable debug APK.
 

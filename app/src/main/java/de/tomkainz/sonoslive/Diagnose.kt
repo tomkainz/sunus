@@ -23,22 +23,43 @@ import java.util.Locale
 object Diagnose {
 
     /** Codes: A = All apps, S = Standard, D = service/network, X = crash. */
-    enum class Code(val text: Int) {
-        A1(R.string.code_a1),
-        A2(R.string.code_a2),
-        A3(R.string.code_a3),
-        A4(R.string.code_a4),
-        A5(R.string.code_a5),
-        S1(R.string.code_s1),
-        S2(R.string.code_s2),
-        S3(R.string.code_s3),
-        D1(R.string.code_d1),
-        D2(R.string.code_d2),
-        D3(R.string.code_d3),
-        D4(R.string.code_d4),
-        X1(R.string.code_x1);
+    enum class Code(val text: Int, val help: Int) {
+        A1(R.string.code_a1, R.string.help_a1),
+        A2(R.string.code_a2, R.string.help_helper),
+        A3(R.string.code_a3, R.string.help_helper),
+        A4(R.string.code_a4, R.string.help_helper),
+        A5(R.string.code_a5, R.string.help_a5),
+        S1(R.string.code_s1, R.string.help_s1),
+        S2(R.string.code_s2, R.string.help_s2),
+        S3(R.string.code_s3, R.string.help_s3),
+        D1(R.string.code_d1, R.string.help_d1),
+        D2(R.string.code_d2, R.string.help_d2),
+        D3(R.string.code_d3, R.string.help_d3),
+        D4(R.string.code_d4, R.string.help_d4),
+        D5(R.string.code_d5, R.string.help_d5),
+        X1(R.string.code_x1, R.string.help_x1);
 
         val label: String get() = "SL-$name"
+
+        companion object {
+            private val PATTERN = Regex("SL-([A-Z][0-9])")
+
+            /** The code named in a message, if there is one. */
+            fun fromText(text: String): Code? =
+                PATTERN.find(text)?.let { match -> entries.firstOrNull { it.name == match.groupValues[1] } }
+
+            /**
+             * Why pointing the speaker at the stream failed. A refused connection
+             * means the phone never reached the speaker, so what the speaker
+             * did with the stream says nothing. [streamRequests] 0 otherwise
+             * means the speaker answered but never came for the stream.
+             */
+            fun forSpeakerFailure(e: Exception, streamRequests: Int): Code = when {
+                e is java.net.ConnectException || e is java.net.NoRouteToHostException -> D5
+                streamRequests == 0 -> D4
+                else -> D3
+            }
+        }
     }
 
     private const val REPORT_FILE = "error-report.txt"

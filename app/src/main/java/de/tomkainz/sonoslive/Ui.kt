@@ -1,18 +1,11 @@
 package de.tomkainz.sonoslive
 
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,8 +24,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -54,48 +45,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.setProgress
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.min
-import kotlin.math.roundToInt
-import kotlin.math.sin
 
-private val ROW = RoundedCornerShape(20.dp)
+internal val ROW = RoundedCornerShape(20.dp)
 
 @Composable
 fun SonosLiveApp(
@@ -105,7 +72,7 @@ fun SonosLiveApp(
     onSelect: (Speaker) -> Unit,
     onAddManual: (String) -> Unit,
     onSetVolume: (Int) -> Unit,
-    onStartPairing: (Int?) -> Unit
+    onStartPairing: () -> Unit
 ) {
     val speakers by AppState.speakers.collectAsStateWithLifecycle()
     val selected by AppState.selected.collectAsStateWithLifecycle()
@@ -372,221 +339,7 @@ private fun VolumeCard(volume: Int, muted: Boolean, onSetVolume: (Int) -> Unit) 
     }
 }
 
-// ---- Sound (EQ) ---------------------------------------------------------
-
-private class Preset(val name: Int, val bass: Int, val treble: Int)
-
-private val PRESETS = listOf(
-    Preset(R.string.eq_flat, 0, 0),
-    Preset(R.string.eq_preset_bass, 4, 0),
-    Preset(R.string.eq_preset_warm, 2, -2),
-    Preset(R.string.eq_preset_vocal, -2, 3)
-)
-
-/**
- * The speaker's sound: presets, bass, treble, loudness, and on home theater
- * speakers night mode and speech enhancement. Folded until tapped; folded,
- * it shows a one-line summary.
- */
-@Composable
-private fun EqCard(eq: Eq) {
-    val c = MaterialTheme.colorScheme
-    var open by rememberSaveable { mutableStateOf(false) }
-    val preset = PRESETS.firstOrNull { it.bass == eq.bass && it.treble == eq.treble }
-    val turn by animateFloatAsState(if (open) 180f else 0f, label = "chevron")
-    Surface(Modifier.fillMaxWidth().animateContentSize(), shape = ROW, color = c.surfaceContainer) {
-        Column {
-            Row(
-                Modifier.fillMaxWidth().clickable { open = !open }.padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                EqGlyph()
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.eq_title), style = MaterialTheme.typography.titleMedium,
-                        color = c.onSurface)
-                    Text(eqSummary(eq, preset), style = MaterialTheme.typography.labelSmall,
-                        color = c.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                ChevronGlyph(Modifier.rotate(turn))
-            }
-            if (open) {
-                Column(Modifier.padding(start = 18.dp, end = 18.dp, bottom = 10.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        PRESETS.forEach { p ->
-                            Chip(stringResource(p.name), p == preset, Modifier.weight(1f)) {
-                                AppState.setEq(eq.copy(bass = p.bass, treble = p.treble))
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    EqSlider(stringResource(R.string.eq_bass), eq.bass) { AppState.setEq(eq.copy(bass = it)) }
-                    EqSlider(stringResource(R.string.eq_treble), eq.treble) { AppState.setEq(eq.copy(treble = it)) }
-                    HorizontalDivider(Modifier.padding(vertical = 6.dp), color = c.outlineVariant)
-                    SwitchRow(stringResource(R.string.eq_loudness), stringResource(R.string.eq_loudness_hint),
-                        eq.loudness) { AppState.setEq(eq.copy(loudness = it)) }
-                    eq.night?.let { on ->
-                        SwitchRow(stringResource(R.string.eq_night), stringResource(R.string.eq_night_hint), on) {
-                            AppState.setEq(eq.copy(night = it))
-                        }
-                    }
-                    eq.speech?.let { on ->
-                        SwitchRow(stringResource(R.string.eq_speech), stringResource(R.string.eq_speech_hint), on) {
-                            AppState.setEq(eq.copy(speech = it))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun eqSummary(eq: Eq, preset: Preset?): String {
-    val parts = mutableListOf(
-        preset?.let { stringResource(it.name) }
-            ?: stringResource(R.string.eq_summary, signed(eq.bass), signed(eq.treble))
-    )
-    if (eq.loudness) parts += stringResource(R.string.eq_loudness)
-    if (eq.night == true) parts += stringResource(R.string.eq_night_short)
-    if (eq.speech == true) parts += stringResource(R.string.eq_speech_short)
-    return parts.joinToString(" · ")
-}
-
-/** With a real minus sign, so +3 and −3 are the same width (with [TABULAR]). */
-private fun signed(v: Int): String = when {
-    v > 0 -> "+$v"
-    v < 0 -> "−${-v}"
-    else -> "0"
-}
-
-@Composable
-private fun Chip(text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val c = MaterialTheme.colorScheme
-    Box(
-        modifier
-            .height(36.dp)
-            .clip(CircleShape)
-            .background(if (selected) c.primary else c.secondaryContainer)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, maxLines = 1,
-            color = if (selected) c.onPrimary else c.onSecondaryContainer)
-    }
-}
-
-/** The whole row switches, not just the switch. */
-@Composable
-private fun SwitchRow(title: String, hint: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    val c = MaterialTheme.colorScheme
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, color = c.onSurface)
-            Text(hint, style = MaterialTheme.typography.labelSmall, color = c.onSurfaceVariant)
-        }
-        Spacer(Modifier.width(12.dp))
-        Switch(
-            checked = checked, onCheckedChange = null,
-            colors = SwitchDefaults.colors(checkedTrackColor = c.primary, checkedThumbColor = c.onPrimary)
-        )
-    }
-}
-
-@Composable
-private fun EqSlider(label: String, value: Int, onChange: (Int) -> Unit) {
-    val c = MaterialTheme.colorScheme
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = c.onSurfaceVariant,
-            modifier = Modifier.width(56.dp))
-        CenterSlider(value, label, onChange, Modifier.weight(1f))
-        Text(signed(value), style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = TABULAR),
-            color = if (value == 0) c.onSurfaceVariant else c.primary,
-            modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
-    }
-}
-
-/** Digits of equal width, so the values do not jitter while dragging. */
-private const val TABULAR = "tnum"
-
-/** Space left and right of the track, so the thumb fits at the ends. */
-private val SLIDER_EDGE = 12.dp
-
-private fun stepAt(x: Float, width: Float, edge: Float): Int =
-    ((x - edge) / (width - 2 * edge) * 20f - 10f).roundToInt().coerceIn(-10, 10)
-
-/**
- * Slider from -10 to +10 that fills from the middle, so raised and lowered
- * values are told apart at a glance. One haptic tick per step.
- */
-@Composable
-private fun CenterSlider(value: Int, label: String, onChange: (Int) -> Unit, modifier: Modifier) {
-    val c = MaterialTheme.colorScheme
-    val haptic = LocalHapticFeedback.current
-    val current by rememberUpdatedState(value)
-    val report by rememberUpdatedState(onChange)
-    val shown by animateFloatAsState(value.toFloat(), tween(90), label = "eq")
-    fun set(v: Int) {
-        if (v == current) return
-        haptic.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
-        report(v)
-    }
-    Canvas(
-        modifier
-            .height(40.dp)
-            .pointerInput(Unit) {
-                val edge = SLIDER_EDGE.toPx()
-                detectTapGestures { set(stepAt(it.x, size.width.toFloat(), edge)) }
-            }
-            .pointerInput(Unit) {
-                val edge = SLIDER_EDGE.toPx()
-                detectHorizontalDragGestures(onDragStart = { set(stepAt(it.x, size.width.toFloat(), edge)) }) { change, _ ->
-                    change.consume()
-                    set(stepAt(change.position.x, size.width.toFloat(), edge))
-                }
-            }
-            .semantics {
-                contentDescription = label
-                stateDescription = signed(value)
-                progressBarRangeInfo = ProgressBarRangeInfo(value.toFloat(), -10f..10f, 19)
-                setProgress { set(it.roundToInt().coerceIn(-10, 10)); true }
-            }
-    ) {
-        val edge = SLIDER_EDGE.toPx()
-        val trackH = 14.dp.toPx()
-        val top = center.y - trackH / 2
-        val left = edge
-        val right = size.width - edge
-        val mid = (left + right) / 2
-        val x = left + (shown + 10f) / 20f * (right - left)
-
-        val track = Path().apply {
-            addRoundRect(RoundRect(left, top, right, top + trackH, CornerRadius(trackH / 2)))
-        }
-        drawPath(track, c.secondaryContainer)
-        clipPath(track) {
-            drawRect(c.primary, topLeft = Offset(min(mid, x), top), size = Size(abs(x - mid), trackH))
-        }
-        // Zero mark, then the thumb with a gap in the card's color around it.
-        drawLine(c.onSurfaceVariant.copy(alpha = 0.6f), Offset(mid, top - 4.dp.toPx()),
-            Offset(mid, top + trackH + 4.dp.toPx()), 2.dp.toPx(), StrokeCap.Round)
-        val gap = 5.dp.toPx()
-        val thumbH = 30.dp.toPx()
-        drawRoundRect(c.surfaceContainer, topLeft = Offset(x - gap, center.y - thumbH / 2 - 2.dp.toPx()),
-            size = Size(gap * 2, thumbH + 4.dp.toPx()), cornerRadius = CornerRadius(gap))
-        drawRoundRect(c.primary, topLeft = Offset(x - 2.dp.toPx(), center.y - thumbH / 2),
-            size = Size(4.dp.toPx(), thumbH), cornerRadius = CornerRadius(2.dp.toPx()))
-    }
-}
-
 // ---- Power button with level ring --------------------------------------
-
 @Composable
 private fun PowerButton(
     running: Boolean, canStart: Boolean, audioFlowing: Boolean, level: Float,
@@ -645,6 +398,10 @@ private fun Snackbar(text: String, modifier: Modifier) {
     ) {
         Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text, style = MaterialTheme.typography.bodyMedium, color = c.onSurface, textAlign = TextAlign.Center)
+            Diagnose.Code.fromText(text)?.let { code ->
+                Text(stringResource(code.help), Modifier.padding(top = 6.dp),
+                    style = MaterialTheme.typography.labelSmall, color = c.onSurfaceVariant, textAlign = TextAlign.Center)
+            }
             if (withReport) {
                 Row {
                     TextButton(onClick = { Diagnose.share(context) }) { Text(stringResource(R.string.report_share)) }
@@ -749,12 +506,10 @@ private fun Hint(text: String) {
 // ---- Pairing (All apps mode) --------------------------------------------
 
 @Composable
-private fun PairingDialog(onStartPairing: (Int?) -> Unit) {
+private fun PairingDialog(onStartPairing: () -> Unit) {
     val c = MaterialTheme.colorScheme
     val busy by AppState.adbBusy.collectAsStateWithLifecycle()
     val adbMessage by AppState.adbMessage.collectAsStateWithLifecycle()
-    var manual by remember { mutableStateOf(false) }
-    var port by remember { mutableStateOf("") }
 
     Box(
         Modifier.fillMaxSize().background(Color(0xCC000000)).imePadding().padding(20.dp),
@@ -771,29 +526,17 @@ private fun PairingDialog(onStartPairing: (Int?) -> Unit) {
                 Text(stringResource(R.string.pair_hint),
                     style = MaterialTheme.typography.labelSmall, color = c.onSurfaceVariant)
 
-                if (manual) {
-                    OutlinedTextField(
-                        value = port, onValueChange = { port = it.filter { ch -> ch.isDigit() }.take(5) },
-                        label = { Text(stringResource(R.string.pair_port_label)) }, singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                Text(stringResource(R.string.pair_code_hint),
+                    style = MaterialTheme.typography.bodyMedium, color = c.onSurface)
 
                 adbMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = c.primary) }
 
-                // Own row: with three buttons in one row, "Start pairing" wrapped several times.
-                TextButton(onClick = { manual = !manual }) {
-                    Text(stringResource(if (manual) R.string.pair_port_auto else R.string.pair_port_manual),
-                        style = MaterialTheme.typography.labelSmall)
-                }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = { AppState.requestPairing.value = false }) { Text(stringResource(R.string.close)) }
                     Spacer(Modifier.width(4.dp))
                     Button(
-                        onClick = { onStartPairing(if (manual) port.toIntOrNull() else null) },
+                        onClick = onStartPairing,
                         enabled = !busy,
                         colors = ButtonDefaults.buttonColors(containerColor = c.primary, contentColor = c.onPrimary)
                     ) {
@@ -802,162 +545,6 @@ private fun PairingDialog(onStartPairing: (Int?) -> Unit) {
                     }
                 }
             }
-        }
-    }
-}
-
-// ---- Hand-drawn icons --------------------------------------------------
-
-@Composable
-private fun CheckGlyph() {
-    val c = MaterialTheme.colorScheme
-    Canvas(Modifier.size(22.dp)) {
-        val w = size.minDimension * 0.11f
-        drawLine(c.primary, Offset(size.width * 0.18f, size.height * 0.52f),
-            Offset(size.width * 0.42f, size.height * 0.74f), w, StrokeCap.Round)
-        drawLine(c.primary, Offset(size.width * 0.42f, size.height * 0.74f),
-            Offset(size.width * 0.82f, size.height * 0.28f), w, StrokeCap.Round)
-    }
-}
-
-@Composable
-private fun SpeakerGlyph(selected: Boolean) {
-    val c = MaterialTheme.colorScheme
-    val col = if (selected) c.primary else c.onSurfaceVariant
-    Canvas(Modifier.size(26.dp)) {
-        val w = size.minDimension * 0.11f
-        drawRoundRect(col, topLeft = Offset(size.width * 0.2f, size.height * 0.06f),
-            size = Size(size.width * 0.6f, size.height * 0.88f),
-            cornerRadius = CornerRadius(size.width * 0.16f), style = Stroke(w))
-        drawCircle(col, radius = size.minDimension * 0.15f, center = Offset(center.x, size.height * 0.6f), style = Stroke(w))
-        drawCircle(col, radius = size.minDimension * 0.035f, center = Offset(center.x, size.height * 0.24f))
-    }
-}
-
-@Composable
-private fun VolumeGlyph(muted: Boolean) {
-    val c = MaterialTheme.colorScheme
-    Canvas(Modifier.size(22.dp)) {
-        val col = c.onSurfaceVariant
-        val w = size.minDimension * 0.1f
-        val body = Path().apply {
-            moveTo(size.width * 0.12f, size.height * 0.38f)
-            lineTo(size.width * 0.32f, size.height * 0.38f)
-            lineTo(size.width * 0.54f, size.height * 0.18f)
-            lineTo(size.width * 0.54f, size.height * 0.82f)
-            lineTo(size.width * 0.32f, size.height * 0.62f)
-            lineTo(size.width * 0.12f, size.height * 0.62f)
-            close()
-        }
-        drawPath(body, col)
-        if (muted) {
-            drawLine(col, Offset(size.width * 0.66f, size.height * 0.37f),
-                Offset(size.width * 0.9f, size.height * 0.63f), w, StrokeCap.Round)
-            drawLine(col, Offset(size.width * 0.9f, size.height * 0.37f),
-                Offset(size.width * 0.66f, size.height * 0.63f), w, StrokeCap.Round)
-        } else {
-            val r = size.minDimension * 0.24f
-            drawArc(col, startAngle = -45f, sweepAngle = 90f, useCenter = false,
-                topLeft = Offset(size.width * 0.5f - r, center.y - r), size = Size(r * 2, r * 2),
-                style = Stroke(w, cap = StrokeCap.Round))
-        }
-    }
-}
-
-/** Three sliders (equalizer). */
-@Composable
-private fun EqGlyph() {
-    val c = MaterialTheme.colorScheme
-    Canvas(Modifier.size(26.dp)) {
-        val col = c.onSurfaceVariant
-        val w = size.minDimension * 0.09f
-        listOf(0.22f to 0.64f, 0.5f to 0.32f, 0.78f to 0.56f).forEach { (x, knob) ->
-            val cx = size.width * x
-            drawLine(col, Offset(cx, size.height * 0.1f), Offset(cx, size.height * 0.9f), w, StrokeCap.Round)
-            drawCircle(col, radius = size.minDimension * 0.12f, center = Offset(cx, size.height * knob))
-        }
-    }
-}
-
-@Composable
-private fun ChevronGlyph(modifier: Modifier) {
-    val c = MaterialTheme.colorScheme
-    Canvas(modifier.size(20.dp)) {
-        val col = c.onSurfaceVariant
-        val w = size.minDimension * 0.1f
-        val tip = Offset(center.x, size.height * 0.64f)
-        drawLine(col, Offset(size.width * 0.24f, size.height * 0.38f), tip, w, StrokeCap.Round)
-        drawLine(col, tip, Offset(size.width * 0.76f, size.height * 0.38f), w, StrokeCap.Round)
-    }
-}
-
-/** Bars that move with the level while audio goes to this speaker. */
-@Composable
-private fun LiveBars(audioFlowing: Boolean, level: Float) {
-    val c = MaterialTheme.colorScheme
-    val lvl by animateFloatAsState(if (audioFlowing) level.coerceIn(0f, 1f) else 0f, tween(140), label = "bars")
-    val phase by rememberInfiniteTransition(label = "bars").animateFloat(
-        0f, 2f * PI.toFloat(), infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "phase"
-    )
-    Canvas(Modifier.size(22.dp)) {
-        val bars = 4
-        val w = size.width / (bars * 2 - 1)
-        repeat(bars) { i ->
-            // Each bar swings with its own phase; the level sets how far.
-            val swing = 0.55f + 0.45f * sin(phase + i * 1.7f)
-            // Never flatter than this, so silent bars do not look like "⋯".
-            val h = size.height * (0.36f + 0.64f * lvl * swing)
-            drawRoundRect(c.primary, topLeft = Offset(i * 2 * w, (size.height - h) / 2),
-                size = Size(w, h), cornerRadius = CornerRadius(w / 2))
-        }
-    }
-}
-
-@Composable
-private fun PowerGlyph(color: Color) {
-    Canvas(Modifier.size(30.dp)) {
-        val w = size.minDimension * 0.11f
-        val r = size.minDimension * 0.33f
-        drawArc(color, startAngle = -62f, sweepAngle = 304f, useCenter = false,
-            topLeft = Offset(center.x - r, center.y - r), size = Size(r * 2, r * 2),
-            style = Stroke(width = w, cap = StrokeCap.Round))
-        drawLine(color, Offset(center.x, center.y - r - w * 0.3f), Offset(center.x, center.y - r * 0.15f),
-            w, StrokeCap.Round)
-    }
-}
-
-@Composable
-private fun StopGlyph(color: Color) {
-    Canvas(Modifier.size(26.dp)) {
-        val s = size.minDimension * 0.56f
-        drawRoundRect(color, topLeft = Offset(center.x - s / 2, center.y - s / 2),
-            size = Size(s, s), cornerRadius = CornerRadius(s * 0.22f, s * 0.22f))
-    }
-}
-
-/** Magnifying glass (search). */
-@Composable
-private fun SearchGlyph() {
-    val c = MaterialTheme.colorScheme
-    Canvas(Modifier.size(24.dp)) {
-        val col = c.onSurfaceVariant
-        val w = size.minDimension * 0.11f
-        val r = size.minDimension * 0.27f
-        val lens = Offset(size.width * 0.42f, size.height * 0.42f)
-        drawCircle(col, radius = r, center = lens, style = Stroke(width = w))
-        drawLine(col, Offset(lens.x + r * 0.72f, lens.y + r * 0.72f),
-            Offset(size.width * 0.84f, size.height * 0.84f), w, StrokeCap.Round)
-    }
-}
-
-/** Three dots (more). */
-@Composable
-private fun MoreGlyph() {
-    val c = MaterialTheme.colorScheme
-    Canvas(Modifier.size(24.dp)) {
-        val r = size.minDimension * 0.08f
-        listOf(0.22f, 0.5f, 0.78f).forEach { x ->
-            drawCircle(c.onSurfaceVariant, radius = r, center = Offset(size.width * x, center.y))
         }
     }
 }

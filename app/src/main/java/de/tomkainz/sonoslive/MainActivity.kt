@@ -25,13 +25,13 @@ class MainActivity : ComponentActivity() {
     ) {
         refreshPermissions()
         // If the notification request came from "Start pairing", continue right away.
-        val port = pairingAfterPermission
-        pairingAfterPermission = null
-        if (port != null && notificationsAllowed()) startPairing(port.takeIf { it > 0 })
+        val continuePairing = pairingAfterPermission
+        pairingAfterPermission = false
+        if (continuePairing && notificationsAllowed()) startPairing()
     }
 
-    /** Port (0 = automatic) of a pairing that is waiting for the notification permission. */
-    private var pairingAfterPermission: Int? = null
+    /** A pairing is waiting for the notification permission. */
+    private var pairingAfterPermission = false
 
     private val projectionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
                     onSelect = { AppState.select(it) },
                     onAddManual = { AppState.addManual(it) },
                     onSetVolume = { AppState.setVolume(it) },
-                    onStartPairing = { port -> startPairing(port) }
+                    onStartPairing = { startPairing() }
                 )
             }
         }
@@ -158,14 +158,14 @@ class MainActivity : ComponentActivity() {
      * then "Wireless debugging". This does not work without notifications,
      * because the code is entered there.
      */
-    private fun startPairing(manualPort: Int?) {
+    private fun startPairing() {
         if (!notificationsAllowed()) {
             AppState.adbMessage.value = getString(R.string.pair_need_notifications)
-            pairingAfterPermission = manualPort ?: 0
+            pairingAfterPermission = true
             permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
             return
         }
-        PairingService.start(this, manualPort)
+        PairingService.start(this)
         openWirelessDebugging()
     }
 

@@ -1,0 +1,50 @@
+name: Bug report
+description: Something does not work
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Sunus version
+      description: For example 1.5 Beta
+    validations:
+      required: true
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and Android version
+      description: For example Pixel 9, Android 17
+    validations:
+      required: true
+  - type: input
+    id: speaker
+    attributes:
+      label: Sonos speaker
+      description: Model, and S1 or S2 if you know it
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - All apps
+        - Standard
+    validations:
+      required: true
+  - type: input
+    id: code
+    attributes:
+      label: Error code
+      description: For example SL-A1, if the app showed one
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected and what happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Error report
+      description: In the app under "⋯", or from the error message. It contains your phone's and speaker's local IP addresses.
