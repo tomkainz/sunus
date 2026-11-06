@@ -313,6 +313,28 @@ object AdbManager {
         AppState.log("Permissions set up: ${commands.size} step(s)")
     }
 
+    /** Gives or takes notification access for "Now playing" through the shell. */
+    fun setNotificationAccess(context: Context, allow: Boolean): Boolean {
+        val component = android.content.ComponentName(
+            context, de.tomkainz.sonoslive.MediaListenerService::class.java
+        ).flattenToString()
+        val verb = if (allow) "allow_listener" else "disallow_listener"
+        // The stream may fail as the shell ends; the result is checked below anyway.
+        runCatching {
+            val process = openShell(context, "cmd notification $verb $component")
+            process.input.bufferedReader().use { it.readText() }
+            process.close()
+        }
+        // Android applies this a moment after the command returns.
+        repeat(15) {
+            if (androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(context)
+                    .contains(context.packageName) == allow
+            ) return true
+            Thread.sleep(200)
+        }
+        return false
+    }
+
     /** Short status for error reports. */
     fun status(context: Context): String {
         val wifi = runCatching {

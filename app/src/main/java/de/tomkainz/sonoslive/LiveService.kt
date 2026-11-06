@@ -117,6 +117,8 @@ class LiveService : Service() {
 
         // If capture ends by itself, end the service too instead of showing
         // "Live" while only silence goes out. The error is already reported.
+        if (mode == CaptureMode.ALL_APPS) warnIfMediaVolumeLow()
+
         val eng = CaptureEngine(this, srv) { handler.post { if (engine != null) stopEverything() } }
         engine = eng
 
@@ -262,6 +264,19 @@ class LiveService : Service() {
 
     // The saved volume lives in the preferences, so it comes back even if the
     // process died while the phone was muted.
+    /**
+     * REMOTE_SUBMIX is captured after the phone's media volume is applied: in the
+     * emulator, volume 0 meant complete silence on the speaker, while "Live" was showing.
+     */
+    private fun warnIfMediaVolumeLow() {
+        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val volume = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+        if (volume * 2 < am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)) {
+            AppState.log("All apps: media volume is low ($volume)")
+            AppState.message.value = getString(R.string.msg_all_apps_volume)
+        }
+    }
+
     private fun muteMusicStream() {
         val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         prefs(this).edit().putInt(KEY_SAVED_VOLUME, am.getStreamVolume(AudioManager.STREAM_MUSIC)).apply()

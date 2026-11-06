@@ -169,7 +169,7 @@ private fun Chip(text: String, selected: Boolean, modifier: Modifier, onClick: (
 
 /** The whole row switches, not just the switch. */
 @Composable
-private fun SwitchRow(title: String, hint: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(title: String, hint: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val c = MaterialTheme.colorScheme
     Row(
         Modifier

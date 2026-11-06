@@ -44,6 +44,28 @@ This mode needs no setup. It uses the official `AudioPlaybackCapture` API, and A
 
 Below the volume, the **Equalizer** card adjusts the selected speaker like the Sonos app does: bass and treble from −10 to +10, Loudness, and four presets (Flat, Bass, Warm, Vocal). Home theater speakers such as the Arc, Beam or Ray also get Night Sound and Speech Enhancement; on other speakers these stay hidden. The settings live on the speaker, so they also apply to everything else it plays. Tapping the speaker icon next to the volume slider mutes the speaker.
 
+## Now playing
+
+Under "⋯", **Show what's playing** adds a card with the title, artist and cover of whichever app is playing, with play/pause, next and previous. It uses Android's media sessions, so it works with any music app that has one. Android calls the permission notification access; Sunus uses only the media controls and does not read your notifications. If "All apps" is set up, the app turns it on through its ADB shell. Otherwise Android's settings open, and for an APK installed by hand you may first have to choose App info > ⋮ > Allow restricted settings.
+
+## Automation
+
+Under "⋯", **Control by other apps** lets Tasker, Home Assistant and others control Sunus. It is off by default, because while it is on, any app on the phone can start the stream.
+
+| Action | Extra | What it does |
+|---|---|---|
+| `de.tomkainz.sonoslive.action.START` | optional `speaker` | Starts the stream |
+| `de.tomkainz.sonoslive.action.STOP` | | Stops the stream |
+| `de.tomkainz.sonoslive.action.SELECT_SPEAKER` | `speaker` | Selects a speaker |
+
+`speaker` is a room name or an IP address on the local network. Send the action as an activity intent, for example:
+
+```
+adb shell am start -n de.tomkainz.sonoslive/.AutomationActivity -a de.tomkainz.sonoslive.action.START --es speaker "Living Room"
+```
+
+Android restricts background apps from starting activities, so the sending app may need a permission for that, such as "Display over other apps". In Standard mode, or before "All apps" is set up, START opens Sunus, because Android may ask for consent or the setup has to be done there.
+
 ## Requirements
 
 - Android 10 or newer
@@ -59,6 +81,8 @@ Tested with Android 17 and a Sonos Play:1 running S2 software.
 |---|---|---|
 | Play:1 (S2) | 17 | Works, used by the author |
 | Arc Ultra, One SL | 16 | The stream did not start on 1.0 Beta ([#1](https://github.com/tomkainz/sunus/issues/1)). 1.5 Beta has a fix that no user has confirmed yet |
+
+[BitChord](https://github.com/kushagrasinghx/BitChord) 1.9 was captured in both modes in the emulator, with its sound showing up in the stream and stopping when paused. Now playing also shows and controls it. This has not been tried on a real speaker.
 
 Tried it on another speaker or phone? Please open an issue, whether it worked or not.
 
@@ -103,7 +127,7 @@ AGP 9.3.1, Kotlin Compose plugin 2.4.10, compileSdk 37, minSdk 29.
 
 - Does "All apps" keep running with the screen locked?
 - Can Spotify be captured in Standard mode?
-- Does the stream stay at full level in Standard mode when the phone's media volume is at zero?
+- In the emulator, Standard mode stays at full level with the phone's media volume at zero, while All apps follows the media volume and goes silent at zero. The app warns about a low volume when All apps starts. Is it the same on real phones?
 - The latency is estimated, not measured.
 - Night Sound and Speech Enhancement have only been tried against a simulated speaker, not a real soundbar.
 

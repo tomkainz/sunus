@@ -60,6 +60,34 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection|connectedDevice" />
 
+        <!-- Off until the user turns it on under "..."; see AutomationActivity. -->
+        <activity
+            android:name=".AutomationActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleInstance"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="de.tomkainz.sonoslive.action.START" />
+                <action android:name="de.tomkainz.sonoslive.action.STOP" />
+                <action android:name="de.tomkainz.sonoslive.action.SELECT_SPEAKER" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Needed only to read media sessions for "Now playing". -->
+        <service
+            android:name=".MediaListenerService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <service
             android:name=".PairingService"
             android:exported="false"

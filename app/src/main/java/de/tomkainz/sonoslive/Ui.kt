@@ -87,6 +87,7 @@ fun SonosLiveApp(
     val muted by AppState.muted.collectAsStateWithLifecycle()
     val eq by AppState.eq.collectAsStateWithLifecycle()
     val requestPairing by AppState.requestPairing.collectAsStateWithLifecycle()
+    val nowPlaying by NowPlaying.info.collectAsStateWithLifecycle()
 
     val c = MaterialTheme.colorScheme
     var showMore by remember { mutableStateOf(false) }
@@ -147,6 +148,12 @@ fun SonosLiveApp(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
             )
+
+            nowPlaying?.let {
+                Spacer(Modifier.height(28.dp))
+                SectionLabel(stringResource(R.string.section_now_playing))
+                NowPlayingCard(it)
+            }
 
             if (selected != null && volume != null) {
                 Spacer(Modifier.height(28.dp))
@@ -379,7 +386,7 @@ private fun PowerButton(
 }
 
 @Composable
-private fun IconSpot(onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+internal fun IconSpot(onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Box(
         modifier.size(48.dp).clip(CircleShape).clickable(onClick = onClick),
         contentAlignment = Alignment.Center
@@ -420,6 +427,8 @@ private fun MoreSheet(
 ) {
     val c = MaterialTheme.colorScheme
     val muteLocal by AppState.muteLocal.collectAsStateWithLifecycle()
+    val nowPlayingOn by NowPlaying.enabled.collectAsStateWithLifecycle()
+    val automationOn by AppState.automationAllowed.collectAsStateWithLifecycle()
     val report by AppState.report.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var ip by remember { mutableStateOf("") }
@@ -465,6 +474,11 @@ private fun MoreSheet(
                         colors = SwitchDefaults.colors(checkedTrackColor = c.primary, checkedThumbColor = c.onPrimary)
                     )
                 }
+
+                SwitchRow(stringResource(R.string.more_now_playing), stringResource(R.string.more_now_playing_hint),
+                    nowPlayingOn) { NowPlaying.setAccess(context, it) }
+                SwitchRow(stringResource(R.string.more_automation), stringResource(R.string.more_automation_hint),
+                    automationOn) { AppState.setAutomationAllowed(it) }
 
                 HorizontalDivider(color = c.outlineVariant)
 

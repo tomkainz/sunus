@@ -37,6 +37,11 @@
     <string name="section_speaker">Lautsprecher</string>
     <string name="section_source">Quelle</string>
     <string name="section_sound">Klang</string>
+    <string name="section_now_playing">Läuft gerade</string>
+    <string name="now_play">Abspielen</string>
+    <string name="now_pause">Pause</string>
+    <string name="now_next">Nächster Titel</string>
+    <string name="now_previous">Vorheriger Titel</string>
     <string name="volume_mute">Stummschalten</string>
     <string name="volume_unmute">Ton an</string>
     <string name="eq_title">Equalizer</string>
@@ -59,6 +64,13 @@
     <!-- Mehr -->
     <string name="more_ip">Lautsprecher per IP</string>
     <string name="ok">OK</string>
+    <string name="more_now_playing">Anzeigen, was läuft</string>
+    <string name="more_now_playing_hint">Titel und Steuerung der App, die gerade spielt. Android nennt das Benachrichtigungszugriff; Sunus nutzt nur die Mediensteuerung und liest deine Benachrichtigungen nicht. Blockiert Android das: App-Info &gt; ⋮ &gt; Eingeschränkte Einstellungen zulassen.</string>
+    <string name="more_automation">Steuerung durch andere Apps</string>
+    <string name="more_automation_hint">Tasker, Home Assistant und andere können den Stream starten und stoppen und einen Lautsprecher wählen. Das könnte jede App auf diesem Handy, also aus lassen, wenn du es nicht brauchst.</string>
+    <string name="auto_off">Sunus: Die Steuerung durch andere Apps ist aus. Einschalten unter ⋯.</string>
+    <string name="auto_no_speaker">Sunus: Kein Lautsprecher für %1$s gefunden.</string>
+    <string name="msg_all_apps_volume">Im Modus „Alle Apps“ kann die Medienlautstärke des Handys begrenzen, wie laut der Lautsprecher spielt. Ist der Ton leise oder fehlt, die Lautstärke erhöhen.</string>
     <string name="more_mute">Handy stumm</string>
     <string name="more_mute_hint">Nur Standard-Modus (Alle Apps ist immer stumm)</string>
     <string name="hint_upnp">In der Sonos-App unter Konto &gt; Datenschutz und Sicherheit &gt; Verbindungssicherheit muss UPnP an sein (Standard).</string>
@@ -125,7 +137,7 @@
     <string name="code_d4">Der Sonos erreicht den Stream auf dem Handy nicht. Sind beide im selben Netz (kein Gast-WLAN, kein VPN)?</string>
     <string name="code_d5">Das Handy erreicht den Lautsprecher nicht.</string>
     <string name="code_x1">Die App ist abgestürzt.</string>
-    <string name="help_a1">„Kabelloses Debugging“ in den Entwickleroptionen einschalten, im WLAN bleiben und erneut versuchen. Der Standard-Modus geht auch ohne.</string>
+    <string name="help_a1">„Kabelloses Debugging“ in den Entwickleroptionen einschalten, für dieses WLAN erlauben, falls Android fragt, und erneut versuchen. Der Standard-Modus geht auch ohne.</string>
     <string name="help_helper">Stoppen, ein paar Sekunden warten und neu starten. Passiert es wieder, bitte den Bericht teilen.</string>
     <string name="help_a5">Das kann passieren, wenn „Kabelloses Debugging“ ausgeht oder das WLAN wechselt. Neu starten.</string>
     <string name="help_s1">Prüfen, ob Sunus das Mikrofon nutzen darf, dann neu starten.</string>

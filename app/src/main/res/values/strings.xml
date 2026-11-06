@@ -38,6 +38,11 @@
     <string name="section_speaker">Speaker</string>
     <string name="section_source">Source</string>
     <string name="section_sound">Sound</string>
+    <string name="section_now_playing">Now playing</string>
+    <string name="now_play">Play</string>
+    <string name="now_pause">Pause</string>
+    <string name="now_next">Next track</string>
+    <string name="now_previous">Previous track</string>
     <string name="volume_mute">Mute</string>
     <string name="volume_unmute">Unmute</string>
     <string name="eq_title">Equalizer</string>
@@ -60,6 +65,13 @@
     <!-- More -->
     <string name="more_ip">Speaker by IP</string>
     <string name="ok">OK</string>
+    <string name="more_now_playing">Show what\'s playing</string>
+    <string name="more_now_playing_hint">Title and controls of the app that\'s playing. Android calls this notification access; Sunus only uses the media controls and does not read your notifications. If Android blocks it: App info &gt; ⋮ &gt; Allow restricted settings.</string>
+    <string name="more_automation">Control by other apps</string>
+    <string name="more_automation_hint">Tasker, Home Assistant and others can start and stop the stream and pick a speaker. Any app on this phone could do that, so leave it off if you don\'t need it.</string>
+    <string name="auto_off">Sunus: control by other apps is off. You can turn it on under ⋯.</string>
+    <string name="auto_no_speaker">Sunus: no speaker found for %1$s.</string>
+    <string name="msg_all_apps_volume">In All apps mode, the phone\'s media volume can limit how loud the speaker plays. If the sound is quiet or missing, turn it up.</string>
     <string name="more_mute">Mute phone</string>
     <string name="more_mute_hint">Standard mode only (All apps is always silent)</string>
     <string name="hint_upnp">In the Sonos app, UPnP must be on under Account &gt; Privacy &amp; Security &gt; Connection Security (default).</string>
@@ -126,7 +138,7 @@
     <string name="code_d4">The Sonos can\'t reach the stream on the phone. Are both on the same network (no guest Wi-Fi, no VPN)?</string>
     <string name="code_d5">The phone can\'t reach the speaker.</string>
     <string name="code_x1">The app crashed.</string>
-    <string name="help_a1">Turn on Wireless debugging in Developer options, stay on Wi-Fi and try again. Standard mode works without it.</string>
+    <string name="help_a1">Turn on Wireless debugging in Developer options, allow it for this Wi-Fi if Android asks, and try again. Standard mode works without it.</string>
     <string name="help_helper">Stop, wait a few seconds and start again. If it happens again, please share the report.</string>
     <string name="help_a5">This can happen when Wireless debugging goes off or the Wi-Fi changes. Start again.</string>
     <string name="help_s1">Check that Sunus may use the microphone, then start again.</string>

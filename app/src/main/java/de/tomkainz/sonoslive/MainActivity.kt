@@ -16,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import de.tomkainz.sonoslive.adb.AdbManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -28,6 +29,7 @@ class MainActivity : ComponentActivity() {
         val continuePairing = pairingAfterPermission
         pairingAfterPermission = false
         if (continuePairing && notificationsAllowed()) startPairing()
+        searchAgainAfterPermission()
     }
 
     /** A pairing is waiting for the notification permission. */
@@ -42,6 +44,43 @@ class MainActivity : ComponentActivity() {
         } else {
             AppState.message.value = getString(R.string.msg_no_consent)
         }
+    }
+
+    /**
+     * The first search runs before the local network permission is granted and
+     * finds nothing. Without this, "No Sonos found" stays until the user searches.
+     * A grant takes a few seconds to reach the network, so this tries more than once.
+     */
+    private fun searchAgainAfterPermission() {
+        if (AppState.speakers.value.isNotEmpty()) return
+        if (Build.VERSION.SDK_INT >= 37 && !granted("android.permission.ACCESS_LOCAL_NETWORK")) return
+        val app = applicationContext
+        AppState.scope.launch {
+            repeat(4) {
+                delay(3000)
+                while (AppState.searching.value) delay(200)
+                if (AppState.speakers.value.isNotEmpty()) return@launch
+                AppState.discover(app)
+                while (AppState.searching.value) delay(200)
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleAutostart(intent)
+    }
+
+    /** Sent by [AutomationActivity], but any app could send it: it obeys the same switch. */
+    private fun handleAutostart(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_AUTOSTART, false) != true) return
+        intent.removeExtra(EXTRA_AUTOSTART)
+        if (AppState.automationAllowed.value && !AppState.running.value) requestStart()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        NowPlaying.start(this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,6 +107,7 @@ class MainActivity : ComponentActivity() {
         AppState.discover(this)
         ensurePermissions()
         if (!AppState.running.value) LiveService.restoreLeftoverVolume(this)
+        if (savedInstanceState == null) handleAutostart(intent)
     }
 
     override fun onResume() {
@@ -83,6 +123,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        NowPlaying.stop()
         // Do not keep the ADB session (and Android's notice about it) open
         // while nothing is streaming. Network: not on the main thread.
         if (!AppState.running.value) {
@@ -231,8 +272,9 @@ class MainActivity : ComponentActivity() {
             }
     }
 
-    private companion object {
-        const val SETTINGS = "com.android.settings"
-        const val OPEN_CHECK_MS = 1500L
+    companion object {
+        const val EXTRA_AUTOSTART = "de.tomkainz.sonoslive.extra.AUTOSTART"
+        private const val SETTINGS = "com.android.settings"
+        private const val OPEN_CHECK_MS = 1500L
     }
 }

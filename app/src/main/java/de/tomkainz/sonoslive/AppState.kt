@@ -37,6 +37,7 @@ object AppState {
 
     val mode = MutableStateFlow(if (allAppsSupported) CaptureMode.ALL_APPS else CaptureMode.STANDARD)
     val muteLocal = MutableStateFlow(true)
+    val automationAllowed = MutableStateFlow(false)
     val streamBaseOverride = MutableStateFlow("")
 
     /** Has ADB pairing succeeded once? */
@@ -83,6 +84,7 @@ object AppState {
             .getOrDefault(CaptureMode.ALL_APPS)
             .takeIf { allAppsSupported } ?: CaptureMode.STANDARD
         muteLocal.value = prefs.getBoolean("muteLocal", true)
+        automationAllowed.value = prefs.getBoolean("automation", false)
         streamBaseOverride.value = prefs.getString("streamBase", "") ?: ""
         adbPaired.value = prefs.getBoolean("adbPaired", false)
         val ip = prefs.getString("speakerIp", null)
@@ -106,6 +108,11 @@ object AppState {
     fun setMuteLocal(on: Boolean) {
         muteLocal.value = on
         prefs.edit().putBoolean("muteLocal", on).apply()
+    }
+
+    fun setAutomationAllowed(on: Boolean) {
+        automationAllowed.value = on
+        prefs.edit().putBoolean("automation", on).apply()
     }
 
     fun setStreamBaseOverride(value: String) {
@@ -142,9 +149,10 @@ object AppState {
                 if (found.isEmpty()) {
                     val ip = Net.localIp(context)
                     if (ip != null) {
-                        status.value = text(R.string.status_scanning)
+                        // A search during a stream must not overwrite "Live".
+                        if (!running.value) status.value = text(R.string.status_scanning)
                         found = Ssdp.scanSubnet(ip) { sp -> addFound(sp) }
-                        status.value = text(R.string.status_ready)
+                        if (!running.value) status.value = text(R.string.status_ready)
                     }
                 }
 
