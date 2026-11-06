@@ -14,8 +14,8 @@ android {
         // AudioPlaybackCapture exists from Android 10
         minSdk = 29
         targetSdk = 37
-        versionCode = 21
-        versionName = "1.5-beta"
+        versionCode = 22
+        versionName = "1.6-beta"
     }
 
     // The key and its password are only stored locally, not in the repository:
