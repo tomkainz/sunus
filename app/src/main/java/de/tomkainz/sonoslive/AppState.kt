@@ -9,6 +9,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -94,9 +96,35 @@ object AppState {
                 room = prefs.getString("speakerRoom", ip) ?: ip,
                 ip = ip,
                 udn = udn,
-                model = prefs.getString("speakerModel", "Sonos") ?: "Sonos"
+                model = prefs.getString("speakerModel", "Sonos") ?: "Sonos",
+                protocol = runCatching { SpeakerProtocol.valueOf(prefs.getString("speakerProtocol", null)!!) }
+                    .getOrDefault(SpeakerProtocol.SONOS),
+                address = prefs.getString("speakerAddress", "") ?: "",
+                details = prefs.getString("speakerDetails", "") ?: ""
             )
         }
+        logChanges()
+    }
+
+    /** What the user saw, in the order they saw it. Volume and level would only flood the log. */
+    private fun logChanges() {
+        watch("Mode", mode)
+        watch("Running", running)
+        watch("Status", status)
+        watch("Message", message)
+        watch("Audio flowing", audioFlowing)
+        watch("Stream clients", clients)
+        watch("Stream URL", streamUrl)
+        watch("Selected speaker", selected)
+        watch("Speakers found", speakers)
+        watch("ADB paired", adbPaired)
+        watch("ADB message", adbMessage)
+        watch("Pairing asked", requestPairing)
+        watch("Now playing access", NowPlaying.enabled)
+    }
+
+    private fun <T> watch(name: String, flow: StateFlow<T>) {
+        scope.launch { flow.collect { log("$name: $it") } }
     }
 
     fun setMode(m: CaptureMode) {
@@ -132,6 +160,9 @@ object AppState {
             .putString("speakerUdn", speaker.udn)
             .putString("speakerRoom", speaker.room)
             .putString("speakerModel", speaker.model)
+            .putString("speakerProtocol", speaker.protocol.name)
+            .putString("speakerAddress", speaker.address)
+            .putString("speakerDetails", speaker.details)
             .apply()
         refreshVolume()
     }
@@ -141,8 +172,8 @@ object AppState {
         searching.value = true
         scope.launch {
             try {
-                // 1. Quickly via SSDP (multicast)
-                var found = Ssdp.discover(context)
+                // 1. Quickly via SSDP and mDNS (multicast)
+                var found = Discovery.search(context)
 
                 // 2. If that finds nothing, scan the local network (routers
                 //    sometimes filter multicast). Hits show up in the list right away.
@@ -151,17 +182,16 @@ object AppState {
                     if (ip != null) {
                         // A search during a stream must not overwrite "Live".
                         if (!running.value) status.value = text(R.string.status_scanning)
-                        found = Ssdp.scanSubnet(ip) { sp -> addFound(sp) }
+                        found = Discovery.scan(ip) { sp -> addFound(sp) }
                         if (!running.value) status.value = text(R.string.status_ready)
                     }
                 }
 
                 val current = selected.value
-                val merged = Ssdp.visibleOnly((found + speakers.value + listOfNotNull(current)))
-                    .distinctBy { it.udn }
-                    .sortedBy { it.room.lowercase() }
+                val merged = Discovery.merge(Ssdp.visibleOnly(found + speakers.value + listOfNotNull(current)))
                 speakers.value = merged
                 if (current == null && merged.size == 1) select(merged.first())
+                else if (current != null) refreshSelected(current, merged)
                 // The empty state is already shown in the list; no duplicate message.
                 refreshVolume()
             } finally {
@@ -170,10 +200,20 @@ object AppState {
         }
     }
 
+    /**
+     * The search may have found another way into the selected device, or a better one.
+     * While streaming, the running driver stays as it is.
+     */
+    private fun refreshSelected(current: Speaker, merged: List<Speaker>) {
+        if (running.value) return
+        merged.firstOrNull { row -> row.udn == current.udn || row.alternatives.any { it.udn == current.udn } }
+            ?.takeIf { it != current }
+            ?.let { select(it) }
+    }
+
     /** Adds a speaker found during the search right away. */
     private fun addFound(speaker: Speaker) {
-        val merged = (speakers.value + speaker).distinctBy { it.udn }
-            .sortedBy { it.room.lowercase() }
+        val merged = Discovery.merge(listOf(speaker) + speakers.value)
         speakers.value = merged
         if (selected.value == null && merged.size == 1) select(speaker)
     }
@@ -182,25 +222,35 @@ object AppState {
         val clean = ip.trim()
         if (clean.isEmpty()) return
         scope.launch {
-            val speaker = Ssdp.probe(clean)
+            val speaker = Discovery.probe(clean).firstOrNull()
             if (speaker == null) {
-                message.value = text(R.string.msg_no_sonos_at, clean)
+                message.value = text(R.string.msg_no_speaker_at, clean)
             } else {
-                speakers.value = (speakers.value + speaker).distinctBy { it.udn }
+                speakers.value = Discovery.merge(listOf(speaker) + speakers.value)
                 select(speaker)
             }
         }
     }
 
-    fun refreshVolume() {
-        val speaker = selected.value ?: return
+    /** [speaker] is who the stream really went to, if not the selected one's first way in. */
+    fun refreshVolume(speaker: Speaker? = selected.value) {
+        val target = speaker ?: return
+        activeControl = SpeakerDrivers.control(target)
         scope.launch {
-            volume.value = runCatching { Sonos(speaker).volume() }.getOrNull()
-            muted.value = runCatching { Sonos(speaker).muted() }.getOrDefault(false)
-            eq.value = runCatching { Sonos(speaker).eq() }.getOrNull()
+            val control = SpeakerDrivers.control(target)
+            volume.value = runCatching { control.volume() }.getOrNull()
+            muted.value = runCatching { control.muted() }.getOrDefault(false)
+            // Only Sonos has these settings.
+            eq.value = (control as? Sonos)?.let { sonos -> runCatching { sonos.eq() }.getOrNull() }
             eqOnSpeaker = eq.value
         }
     }
+
+    /** Who the slider talks to. */
+    @Volatile
+    private var activeControl: SpeakerControl? = null
+
+    private fun control(): SpeakerControl? = activeControl ?: selected.value?.let { SpeakerDrivers.control(it) }
 
     private var eqJob: Job? = null
 
@@ -239,18 +289,17 @@ object AppState {
      * sent, shortly after, so requests cannot overtake each other.
      */
     fun setVolume(v: Int) {
-        val speaker = selected.value ?: return
+        val target = control() ?: return
         val value = v.coerceIn(0, 100)
         volume.value = value
         volumeJob?.cancel()
         volumeJob = scope.launch {
             delay(150)
             runCatching {
-                val sonos = Sonos(speaker)
-                sonos.setVolume(value)
+                target.setVolume(value)
                 // As in the Sonos app: changing the volume ends muting.
                 if (muted.value) {
-                    sonos.setMuted(false)
+                    target.setMuted(false)
                     muted.value = false
                 }
             }.onFailure { message.value = text(R.string.msg_volume_error, it.message ?: "") }
@@ -258,10 +307,10 @@ object AppState {
     }
 
     fun setMuted(on: Boolean) {
-        val speaker = selected.value ?: return
+        val target = control() ?: return
         muted.value = on
         scope.launch {
-            runCatching { Sonos(speaker).setMuted(on) }
+            runCatching { target.setMuted(on) }
                 .onFailure {
                     muted.value = !on
                     message.value = text(R.string.msg_volume_error, it.message ?: "")
@@ -272,8 +321,9 @@ object AppState {
     private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ROOT)
 
     fun log(line: String) {
-        val stamped = "${timeFormat.format(Date())}  $line"
+        val stamped = synchronized(timeFormat) { "${timeFormat.format(Date())}  $line" }
         android.util.Log.i("Sunus", line)
-        requestLog.value = (listOf(stamped) + requestLog.value).take(60)
+        AppLog.append(line)
+        requestLog.update { (listOf(stamped) + it).take(100) }
     }
 }

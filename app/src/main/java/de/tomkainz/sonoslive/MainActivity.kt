@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
         if (result.resultCode == RESULT_OK && data != null) {
             LiveService.startStandard(this, result.resultCode, data)
         } else {
+            AppState.log("Standard: no consent to record")
             AppState.message.value = getString(R.string.msg_no_consent)
         }
     }
@@ -94,7 +95,10 @@ class MainActivity : ComponentActivity() {
             SonosLiveTheme {
                 SonosLiveApp(
                     onStart = { requestStart() },
-                    onStop = { LiveService.stop(this) },
+                    onStop = {
+                        AppState.log("Stop pressed")
+                        LiveService.stop(this)
+                    },
                     onDiscover = { AppState.discover(this) },
                     onSelect = { AppState.select(it) },
                     onAddManual = { AppState.addManual(it) },
@@ -128,13 +132,14 @@ class MainActivity : ComponentActivity() {
         // while nothing is streaming. Network: not on the main thread.
         if (!AppState.running.value) {
             val app = applicationContext
-            AppState.scope.launch { AdbManager.disconnect(app) }
+            AppState.scope.launch { AdbManager.disconnectIfIdle(app) }
         }
     }
 
     // ---- Start of the selected mode --------------------------------------
 
     private fun requestStart() {
+        AppState.log("Start pressed: ${AppState.mode.value}, speaker ${AppState.selected.value?.room}")
         if (AppState.selected.value == null) {
             AppState.message.value = getString(R.string.msg_pick_speaker)
             return
@@ -184,7 +189,10 @@ class MainActivity : ComponentActivity() {
 
     private fun ensurePermissions(withMicrophone: Boolean = AppState.mode.value == CaptureMode.STANDARD) {
         val missing = needed(withMicrophone).filterNot { granted(it) }
-        if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray())
+        if (missing.isNotEmpty()) {
+            AppState.log("Asking for permissions: ${missing.joinToString()}")
+            permissionLauncher.launch(missing.toTypedArray())
+        }
     }
 
     private fun refreshPermissions() {

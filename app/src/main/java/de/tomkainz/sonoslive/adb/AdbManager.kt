@@ -305,11 +305,7 @@ object AdbManager {
             }
         }
         if (commands.isEmpty()) return
-        runCatching {
-            val process = openShell(context, commands.joinToString("; "))
-            process.input.bufferedReader().use { it.readText() }
-            process.close()
-        }
+        runCatching { runShell(context, commands.joinToString("; ")) }
         AppState.log("Permissions set up: ${commands.size} step(s)")
     }
 
@@ -319,12 +315,8 @@ object AdbManager {
             context, de.tomkainz.sonoslive.MediaListenerService::class.java
         ).flattenToString()
         val verb = if (allow) "allow_listener" else "disallow_listener"
-        // The stream may fail as the shell ends; the result is checked below anyway.
-        runCatching {
-            val process = openShell(context, "cmd notification $verb $component")
-            process.input.bufferedReader().use { it.readText() }
-            process.close()
-        }
+        // The result is checked below anyway.
+        runCatching { runShell(context, "cmd notification $verb $component") }
         // Android applies this a moment after the command returns.
         repeat(15) {
             if (androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(context)
@@ -381,6 +373,34 @@ object AdbManager {
     }
 
     /**
+     * Held by one "All apps" run, from connecting until its helper is stopped and the
+     * connection is closed. A quick Start after Stop used to reuse the old connection,
+     * and the old run's cleanup then closed it under the new one ("Stream closed.",
+     * SL-A5, phone log of 08.11.2026), or could kill the new helper.
+     */
+    private val session = java.util.concurrent.Semaphore(1)
+
+    /** Waits until no other run holds the connection. False after [timeoutMs]. */
+    fun beginSession(timeoutMs: Long): Boolean =
+        try {
+            session.tryAcquire(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (e: InterruptedException) {
+            false
+        }
+
+    fun endSession() = session.release()
+
+    /** Closes the connection, unless a run is using it or about to. */
+    fun disconnectIfIdle(context: Context) {
+        if (!session.tryAcquire()) return
+        try {
+            disconnect(context)
+        } finally {
+            session.release()
+        }
+    }
+
+    /**
      * Runs a shell command and returns its running data stream.
      * Closing the stream ends the command.
      */
@@ -419,11 +439,7 @@ object AdbManager {
     fun stopHelper(context: Context) {
         val command = "X='SubmixRecorde[r]'; P=\$(pgrep -f \"\$X\") && kill \$P && sleep 1 && " +
             "P=\$(pgrep -f \"\$X\") && kill -9 \$P; true"
-        runCatching {
-            val process = openShell(context, command)
-            process.input.bufferedReader().use { it.readText() }
-            process.close()
-        }
+        runCatching { runShell(context, command) }
     }
 
     /**
@@ -438,12 +454,64 @@ object AdbManager {
         val command = "echo '== Helper (stderr, exit code) =='; cat $ERROR_FILE 2>/dev/null; " +
             "echo; echo '== Log =='; " +
             "logcat -d -v time -t '$since' AndroidRuntime:* app_process:* DEBUG:* libc:* " +
-            "AudioRecord:* AudioFlinger:E AudioPolicyManager:E *:S 2>&1 | tail -n 120"
-        val process = openShell(context, command)
-        val text = process.input.bufferedReader().use { it.readText() }
-        process.close()
-        text.trim()
+            "AudioRecord:* AudioFlinger:E AudioPolicyManager:E r_submix:W *:S 2>&1 | tail -n 120"
+        runShell(context, command).trim()
     }.getOrElse { "Report not readable: $it" }
+
+    /**
+     * Runs a command to its end and returns its output.
+     *
+     * An AdbStream cannot be read to its end. If the command ends while output is still unread,
+     * the read after that output waits forever. If the reader was already waiting, it gets
+     * "Stream closed." instead, and a plain readText() loses the output. So the command prints
+     * an end mark and reading stops there. Should the mark never come, the limit closes the
+     * stream, which wakes the reader.
+     */
+    private fun runShell(context: Context, command: String): String {
+        // Split by quotes, so that only the echo's output is the mark, never the command line.
+        val process = openShell(context, "$command; echo ${END_MARK.take(5)}\"\"${END_MARK.drop(5)}")
+        val limit = Thread {
+            try {
+                Thread.sleep(SHELL_LIMIT_MS)
+                AppState.log("ADB: no end of the command after $SHELL_LIMIT_MS ms, closing it")
+                process.close()
+            } catch (e: InterruptedException) {
+                // The command ended in time.
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+        try {
+            return readUntilMark(process.input)
+        } finally {
+            limit.interrupt()
+            process.close()
+        }
+    }
+
+    /** Everything before the end mark, or all there is if the stream ends without one. */
+    internal fun readUntilMark(input: InputStream): String {
+        val out = java.io.ByteArrayOutputStream()
+        // Big enough for a whole packet at once: once the stream is closed it answers -1
+        // even if the packet it was still handing out has more in it.
+        val buffer = ByteArray(256 * 1024)
+        try {
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                out.write(buffer, 0, read)
+                val text = out.toString("UTF-8")
+                if (END_MARK in text) return text.substringBefore(END_MARK)
+            }
+        } catch (e: java.io.IOException) {
+            // The stream closed early, see runShell. What came before it still counts.
+        }
+        return out.toString("UTF-8")
+    }
+
+    internal const val END_MARK = "SUNUS_SHELL_END"
+    private const val SHELL_LIMIT_MS = 15_000L
 
     private fun hostIp(context: Context): String {
         // Self-pairing: the ADB service listens on all interfaces of the

@@ -104,11 +104,11 @@ object Automation {
     fun resolve(context: Context, query: String): Speaker? {
         val known = AppState.speakers.value + listOfNotNull(AppState.selected.value)
         findSpeaker(known, query)?.let { return it }
-        if (IPV4.matches(query)) return if (isLocalAddress(query)) Ssdp.probe(query) else null
-        val found = Ssdp.discover(context).ifEmpty {
-            Net.localIp(context)?.let { Ssdp.scanSubnet(it) }.orEmpty()
+        if (IPV4.matches(query)) return if (isLocalAddress(query)) Discovery.probe(query).firstOrNull() else null
+        val found = Discovery.search(context).ifEmpty {
+            Net.localIp(context)?.let { Discovery.scan(it) { } }.orEmpty()
         }
-        AppState.speakers.value = (AppState.speakers.value + found).distinctBy { it.udn }.sortedBy { it.room.lowercase() }
+        AppState.speakers.value = Discovery.merge(found + AppState.speakers.value)
         return findSpeaker(found, query)
     }
 }

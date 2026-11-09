@@ -7,11 +7,8 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.HttpURLConnection
 import java.net.InetAddress
-import java.net.InetSocketAddress
-import java.net.Socket
 import java.net.SocketTimeoutException
 import java.net.URL
-import java.util.Collections
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -27,11 +24,44 @@ data class Eq(
     val speech: Boolean? = null
 )
 
+/** Which picture a speaker gets. */
+enum class SpeakerKind {
+    BAR, SUB, BOX, TOWER, HOMEPOD, HOMEPOD_MINI;
+
+    companion object {
+        private val BARS = setOf("arc", "beam", "ray", "playbar", "playbase")
+        private val BOXES = setOf("amp", "port", "connect", "boost", "bridge")
+
+        fun of(model: String): SpeakerKind {
+            val words = model.lowercase().split(Regex("[^a-z0-9]+"))
+            return when {
+                "homepod" in words -> if ("mini" in words) HOMEPOD_MINI else HOMEPOD
+                words.any { it in BARS } -> BAR
+                "sub" in words -> SUB
+                words.any { it in BOXES } -> BOX
+                else -> TOWER
+            }
+        }
+    }
+}
+
+/** How a speaker gets the stream. The order is the preference when a device offers several. */
+enum class SpeakerProtocol(val label: String?, val alpha: Boolean = false) {
+    SONOS(null), UPNP("UPnP", alpha = true), CAST("Cast", alpha = true), AIRPLAY("AirPlay", alpha = true)
+}
+
 data class Speaker(
     val room: String,
     val ip: String,
     val udn: String,
-    val model: String
+    val model: String,
+    val protocol: SpeakerProtocol = SpeakerProtocol.SONOS,
+    /** UPnP: the description's URL. Cast and AirPlay: the port. */
+    val address: String = "",
+    /** AirPlay: what the speaker announces, see AirPlayFeatures. */
+    val details: String = "",
+    /** The same device's other ways in, for when the first will not play. */
+    val alternatives: List<Speaker> = emptyList()
 )
 
 /**
@@ -44,6 +74,10 @@ object Ssdp {
     private const val ADDR = "239.255.255.250"
     private const val PORT = 1900
     private const val SEARCH_TARGET = "urn:schemas-upnp-org:device:ZonePlayer:1"
+    const val MEDIA_RENDERER = "urn:schemas-upnp-org:device:MediaRenderer:1"
+
+    fun locationOf(answer: String): String? =
+        Regex("(?im)^LOCATION:\\s*(\\S+)").find(answer)?.groupValues?.get(1)
 
     fun discover(context: Context, timeoutMs: Int = 3500): List<Speaker> {
         val wifi = context.applicationContext
@@ -53,16 +87,29 @@ object Ssdp {
             runCatching { acquire() }
         }
 
-        val found = LinkedHashMap<String, Speaker>()
         try {
-            val query = (
-                "M-SEARCH * HTTP/1.1\r\n" +
-                    "HOST: $ADDR:$PORT\r\n" +
-                    "MAN: \"ssdp:discover\"\r\n" +
-                    "MX: 1\r\n" +
-                    "ST: $SEARCH_TARGET\r\n" +
-                    "\r\n"
-                ).toByteArray()
+            return search(timeoutMs)
+        } finally {
+            runCatching { lock?.release() }
+        }
+    }
+
+    /** The search itself. Without a [Context], so it can also run outside a phone. */
+    fun search(timeoutMs: Int = 3500): List<Speaker> {
+        val found = java.util.concurrent.ConcurrentHashMap<String, Speaker>()
+        val asked = HashSet<String>()
+        run {
+            val queries = listOf(SEARCH_TARGET, MEDIA_RENDERER).map { target ->
+                (
+                    "M-SEARCH * HTTP/1.1\r\n" +
+                        "HOST: $ADDR:$PORT\r\n" +
+                        "MAN: \"ssdp:discover\"\r\n" +
+                        "MX: 1\r\n" +
+                        "ST: $target\r\n" +
+                        "\r\n"
+                    ).toByteArray()
+            }
+            val pool = Executors.newFixedThreadPool(6)
 
             DatagramSocket().use { socket ->
                 socket.reuseAddress = true
@@ -71,7 +118,9 @@ object Ssdp {
 
                 // Send several times: UDP multicast often gets lost on Wi-Fi.
                 repeat(3) {
-                    runCatching { socket.send(DatagramPacket(query, query.size, target, PORT)) }
+                    queries.forEach { query ->
+                        runCatching { socket.send(DatagramPacket(query, query.size, target, PORT)) }
+                    }
                 }
 
                 val deadline = System.currentTimeMillis() + timeoutMs
@@ -87,51 +136,29 @@ object Ssdp {
                     }
                     val text = String(packet.data, 0, packet.length)
                     val ip = packet.address?.hostAddress ?: continue
-                    if (found.containsKey(ip)) continue
-                    val location = Regex("(?im)^LOCATION:\\s*(\\S+)")
-                        .find(text)?.groupValues?.get(1) ?: continue
-                    describe(location, ip)?.let { found[ip] = it }
+                    val location = locationOf(text) ?: continue
+                    // A device answers both searches, with the same place to look.
+                    if (!asked.add(location)) continue
+                    // One slow device must not hold up the others.
+                    pool.execute { describeAny(location, ip)?.let { found[location] = it } }
                 }
             }
-        } finally {
-            runCatching { lock?.release() }
+            pool.shutdown()
+            pool.awaitTermination(4, TimeUnit.SECONDS)
         }
         return visibleOnly(found.values.toList()).sortedBy { it.room.lowercase() }
-    }
-
-    /**
-     * Fallback when SSDP (multicast) finds nothing, for example because the
-     * router filters multicast: scan our own /24 subnet. First a quick TCP test
-     * on port 1400; only hosts that answer are queried in full.
-     * Found speakers are reported right away through [onFound].
-     */
-    fun scanSubnet(localIp: String, onFound: ((Speaker) -> Unit)? = null): List<Speaker> {
-        val base = localIp.substringBeforeLast('.')
-        val found = Collections.synchronizedList(mutableListOf<Speaker>())
-        val pool = Executors.newFixedThreadPool(48)
-        try {
-            val tasks = (1..254).map { i ->
-                pool.submit {
-                    val ip = "$base.$i"
-                    if (ip == localIp) return@submit
-                    val reachable = try {
-                        Socket().use { it.connect(InetSocketAddress(ip, 1400), 300); true }
-                    } catch (e: Exception) {
-                        false
-                    }
-                    if (reachable) probe(ip)?.let { found.add(it); onFound?.invoke(it) }
-                }
-            }
-            tasks.forEach { runCatching { it.get(6, TimeUnit.SECONDS) } }
-        } finally {
-            pool.shutdownNow()
-        }
-        return visibleOnly(found.distinctBy { it.udn }).sortedBy { it.room.lowercase() }
     }
 
     /** For manually entered addresses (and the emulator, which cannot do multicast). */
     fun probe(ip: String): Speaker? =
         describe("http://$ip:1400/xml/device_description.xml", ip)
+
+    /** A Sonos, or any other renderer. */
+    private fun describeAny(location: String, ip: String): Speaker? = runCatching {
+        val xml = UpnpDescription.get(location)
+        if (UpnpDescription.isSonos(xml)) describe(location, ip)
+        else UpnpDescription.parse(xml, location)?.let { UpnpDescription.speaker(it, location) }
+    }.getOrNull()
 
     private fun describe(location: String, ip: String): Speaker? = try {
         val conn = (URL(location).openConnection() as HttpURLConnection).apply {
@@ -157,7 +184,7 @@ object Ssdp {
      * cannot play on their own. The topology marks them with Invisible="1".
      */
     fun visibleOnly(list: List<Speaker>): List<Speaker> {
-        val first = list.firstOrNull() ?: return list
+        val first = list.firstOrNull { it.protocol == SpeakerProtocol.SONOS } ?: return list
         val topology = runCatching { Sonos(first).zoneGroupState() }.getOrNull() ?: return list
         val hidden = Sonos.hiddenUdns(topology)
         return list.filterNot { it.udn in hidden }
@@ -173,7 +200,7 @@ object Ssdp {
  * is turned on in the Sonos app under Account > Privacy & Security >
  * Connection Security (default: on).
  */
-class Sonos(val speaker: Speaker) {
+class Sonos(val speaker: Speaker) : SpeakerControl {
 
     companion object {
         private const val AVT = "urn:schemas-upnp-org:service:AVTransport:1"
@@ -259,6 +286,10 @@ class Sonos(val speaker: Speaker) {
     fun transportState(): String =
         value(avt("GetTransportInfo", "<InstanceID>0</InstanceID>"), "CurrentTransportState") ?: ""
 
+    /** Why the speaker is in that state, if it says: "OK" or an error of its own. */
+    fun transportStatus(): String =
+        value(avt("GetTransportInfo", "<InstanceID>0</InstanceID>"), "CurrentTransportStatus") ?: ""
+
     /** The URI the speaker is currently playing (empty if none is set). */
     fun currentUri(): String =
         unesc(value(avt("GetMediaInfo", "<InstanceID>0</InstanceID>"), "CurrentURI") ?: "")
@@ -279,20 +310,20 @@ class Sonos(val speaker: Speaker) {
 
     // ---- Volume -----------------------------------------------------------
 
-    fun volume(): Int =
+    override fun volume(): Int =
         value(rc("GetVolume", "<InstanceID>0</InstanceID><Channel>Master</Channel>"), "CurrentVolume")
             ?.toIntOrNull() ?: 0
 
-    fun setVolume(v: Int) = rc(
+    override fun setVolume(v: Int) = rc(
         "SetVolume",
         "<InstanceID>0</InstanceID><Channel>Master</Channel>" +
             "<DesiredVolume>${v.coerceIn(0, 100)}</DesiredVolume>"
     ).let { }
 
-    fun muted(): Boolean =
+    override fun muted(): Boolean =
         value(rc("GetMute", "<InstanceID>0</InstanceID><Channel>Master</Channel>"), "CurrentMute") == "1"
 
-    fun setMuted(on: Boolean) = rc(
+    override fun setMuted(on: Boolean) = rc(
         "SetMute",
         "<InstanceID>0</InstanceID><Channel>Master</Channel>" +
             "<DesiredMute>${if (on) 1 else 0}</DesiredMute>"
@@ -347,37 +378,7 @@ class Sonos(val speaker: Speaker) {
         action: String,
         body: String,
         readTimeoutMs: Int = 8000
-    ): String {
-        val envelope =
-            "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
-                "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" " +
-                "s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">" +
-                "<s:Body><u:$action xmlns:u=\"$service\">$body</u:$action></s:Body></s:Envelope>"
-
-        val conn = (URL("http://${speaker.ip}:1400$path").openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            setRequestProperty("Content-Type", "text/xml; charset=\"utf-8\"")
-            setRequestProperty("SOAPACTION", "\"$service#$action\"")
-            connectTimeout = 4000
-            readTimeout = readTimeoutMs
-            doOutput = true
-        }
-        try {
-            conn.outputStream.use { it.write(envelope.toByteArray(Charsets.UTF_8)) }
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
-            if (code !in 200..299) {
-                throw IOException("$action: HTTP $code ${errorText(text)}")
-            }
-            return text
-        } finally {
-            conn.disconnect()
-        }
-    }
+    ): String = Soap.call("http://${speaker.ip}:1400$path", service, action, body, readTimeoutMs)
 
     private fun value(xml: String, tag: String): String? = xmlValue(xml, tag)
-
-    private fun errorText(xml: String): String =
-        value(xml, "errorDescription") ?: value(xml, "errorCode")?.let { "(UPnP error $it)" } ?: ""
 }

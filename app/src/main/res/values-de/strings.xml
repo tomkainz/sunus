@@ -20,7 +20,7 @@
     <string name="status_live_standard">Live (Standard)</string>
     <string name="status_live_all_apps">Live (alle Apps)</string>
     <string name="empty_searching">Suche im WLAN…</string>
-    <string name="empty_none">Kein Sonos gefunden</string>
+    <string name="empty_none">Kein Lautsprecher gefunden</string>
     <string name="empty_hint">Tippen zum Suchen · IP unter ⋯</string>
 
     <!-- Meldungen -->
@@ -31,7 +31,7 @@
     <string name="msg_need_record">Für den Standard-Modus die Mikrofon-/Aufnahme-Berechtigung erlauben.</string>
     <string name="msg_need_network">Ohne die Berechtigung für das lokale Netzwerk findet die App keinen Lautsprecher.</string>
     <string name="msg_no_speaker">Kein Lautsprecher gewählt.</string>
-    <string name="msg_no_sonos_at">Unter %1$s antwortet kein Sonos.</string>
+    <string name="msg_no_speaker_at">Unter %1$s antwortet kein Lautsprecher.</string>
     <string name="msg_volume_error">Lautstärke: %1$s</string>
     <string name="msg_eq_error">Klang: %1$s</string>
     <string name="section_speaker">Lautsprecher</string>
@@ -64,17 +64,17 @@
     <!-- Mehr -->
     <string name="more_ip">Lautsprecher per IP</string>
     <string name="ok">OK</string>
-    <string name="more_now_playing">Anzeigen, was läuft</string>
-    <string name="more_now_playing_hint">Titel und Steuerung der App, die gerade spielt. Android nennt das Benachrichtigungszugriff; Sunus nutzt nur die Mediensteuerung und liest deine Benachrichtigungen nicht. Blockiert Android das: App-Info &gt; ⋮ &gt; Eingeschränkte Einstellungen zulassen.</string>
+    <string name="more_now_playing">Titel und Cover anzeigen</string>
+    <string name="more_now_playing_hint">Abspielen, Pause und Überspringen gehen auch ohne. Für Titel und Cover verlangt Android den Benachrichtigungszugriff; Sunus nutzt nur die Mediensteuerung und liest deine Benachrichtigungen nicht. Blockiert Android das: App-Info &gt; ⋮ &gt; Eingeschränkte Einstellungen zulassen.</string>
     <string name="more_automation">Steuerung durch andere Apps</string>
     <string name="more_automation_hint">Tasker, Home Assistant und andere können den Stream starten und stoppen und einen Lautsprecher wählen. Das könnte jede App auf diesem Handy, also aus lassen, wenn du es nicht brauchst.</string>
     <string name="auto_off">Sunus: Die Steuerung durch andere Apps ist aus. Einschalten unter ⋯.</string>
     <string name="auto_no_speaker">Sunus: Kein Lautsprecher für %1$s gefunden.</string>
-    <string name="msg_all_apps_volume">Im Modus „Alle Apps“ kann die Medienlautstärke des Handys begrenzen, wie laut der Lautsprecher spielt. Ist der Ton leise oder fehlt, die Lautstärke erhöhen.</string>
+    <string name="msg_all_apps_volume">Alle Apps: Ist der Ton leise oder fehlt, die Medienlautstärke am Handy erhöhen.</string>
     <string name="more_mute">Handy stumm</string>
     <string name="more_mute_hint">Nur Standard-Modus (Alle Apps ist immer stumm)</string>
-    <string name="hint_upnp">In der Sonos-App unter Konto &gt; Datenschutz und Sicherheit &gt; Verbindungssicherheit muss UPnP an sein (Standard).</string>
-    <string name="hint_lossless">Verlustfreie Übertragung (PCM). Der Ton kommt etwas später am Sonos an: für Musik ideal, für Videos nicht lippensynchron.</string>
+    <string name="hint_upnp">Bei Sonos-Lautsprechern: In der Sonos-App unter Konto &gt; Datenschutz und Sicherheit &gt; Verbindungssicherheit muss UPnP an sein (Standard).</string>
+    <string name="hint_lossless">Verlustfreie Übertragung (PCM). Der Ton kommt etwas später am Lautsprecher an: für Musik ideal, für Videos nicht lippensynchron.</string>
     <string name="hint_all_apps">Alle Apps: einmal \"Kabelloses Debugging\" in den Entwickleroptionen einschalten und koppeln. Kein Root nötig. Danach schaltet die App es selbst wieder ein, auch nach einem Neustart. Die Entwickleroptionen müssen an bleiben; fragt Android nach dem WLAN, \"In diesem Netzwerk immer zulassen\" ankreuzen.</string>
     <string name="last_report">Letzter Fehlerbericht</string>
     <string name="share">Teilen</string>
@@ -118,7 +118,7 @@
     <string name="adb_not_found">Kabelloses Debugging nicht gefunden. Ist es an und das WLAN verbunden?</string>
 
     <!-- Stream-Benachrichtigung -->
-    <string name="notif_live_text">Handy-Ton läuft auf dem Sonos</string>
+    <string name="notif_live_text">Handy-Ton läuft auf dem Lautsprecher</string>
     <string name="notif_stop">Stopp</string>
 
     <!-- Fehlercodes und Bericht -->
@@ -133,8 +133,8 @@
     <string name="code_s3">Keine Zustimmung zur Aufnahme.</string>
     <string name="code_d1">Keine WLAN-Adresse. Ist das Handy im WLAN?</string>
     <string name="code_d2">Stream-Server startet nicht.</string>
-    <string name="code_d3">Der Sonos nimmt den Stream nicht an.</string>
-    <string name="code_d4">Der Sonos erreicht den Stream auf dem Handy nicht. Sind beide im selben Netz (kein Gast-WLAN, kein VPN)?</string>
+    <string name="code_d3">Der Lautsprecher nimmt den Stream nicht an.</string>
+    <string name="code_d4">Der Lautsprecher erreicht den Stream auf dem Handy nicht. Sind beide im selben Netz (kein Gast-WLAN, kein VPN)?</string>
     <string name="code_d5">Das Handy erreicht den Lautsprecher nicht.</string>
     <string name="code_x1">Die App ist abgestürzt.</string>
     <string name="help_a1">„Kabelloses Debugging“ in den Entwickleroptionen einschalten, für dieses WLAN erlauben, falls Android fragt, und erneut versuchen. Der Standard-Modus geht auch ohne.</string>
@@ -145,11 +145,29 @@
     <string name="help_s3">Beim Start die Aufnahme-Abfrage von Android bestätigen. Sobald „Alle Apps“ eingerichtet ist, entfällt sie.</string>
     <string name="help_d1">Das Handy mit demselben WLAN wie den Lautsprecher verbinden.</string>
     <string name="help_d2">Die App ganz schließen und neu öffnen.</string>
-    <string name="help_d3">In der Sonos-App prüfen, ob UPnP an ist, dann erneut versuchen. Wenn vorhanden, auch einen anderen Lautsprecher probieren.</string>
+    <string name="help_d3">Bei einem Sonos in der Sonos-App prüfen, ob UPnP an ist, dann erneut versuchen. Wenn vorhanden, auch einen anderen Lautsprecher probieren.</string>
     <string name="help_d4">Ein VPN ausschalten und die Berechtigung für das lokale Netz bei Sunus prüfen.</string>
+    <string name="code_d6">Der Lautsprecher lässt dieses Handy nicht abspielen.</string>
+    <string name="help_d6">Beim HomePod: In der Home-App unter Einstellungen für dieses Zuhause den Zugriff auf Lautsprecher für alle im selben Netzwerk erlauben. Lautsprecher, die einen Code oder ein Passwort verlangen, gehen noch nicht.</string>
     <string name="help_d5">Prüfen, ob der Lautsprecher an und im selben WLAN ist, dann erneut nach Lautsprechern suchen.</string>
     <string name="help_x1">Bitte den Bericht teilen, damit der Absturz behoben werden kann.</string>
     <string name="report_share_title">Fehlerbericht teilen</string>
     <string name="report_saved">Gespeichert unter Downloads/%1$s</string>
     <string name="report_save_failed">Speichern fehlgeschlagen: %1$s</string>
+
+    <string name="status_connected">Verbunden</string>
+    <string name="status_connected_silent">Verbunden · still</string>
+    <string name="status_waiting_speaker">Warte auf Lautsprecher…</string>
+    <string name="now_nothing">Gerade läuft nichts</string>
+    <string name="now_enable_title">Titel und Cover anzeigen</string>
+    <string name="now_enable_hint">Zum Einschalten tippen</string>
+    <string name="power_start">Stream starten</string>
+    <string name="power_stop">Stream stoppen</string>
+    <string name="action_search">Lautsprecher suchen</string>
+    <string name="action_more">Mehr</string>
+    <string name="log_title">Log</string>
+    <string name="log_hint">Gibt es jederzeit, auch ohne Fehler. Er enthält IP-Adressen, Raumnamen und Gerätedaten.</string>
+    <string name="log_share">Log teilen</string>
+    <string name="log_building">Log wird erstellt…</string>
+    <string name="log_failed">Log fehlgeschlagen: %1$s</string>
 </resources>

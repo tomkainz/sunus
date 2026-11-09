@@ -16,10 +16,11 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import java.io.IOException
 import kotlinx.coroutines.launch
 
 /**
- * Keeps the live stream alive, captures audio and points the Sonos at the URL.
+ * Keeps the live stream alive, captures audio and points the speaker at the URL.
  *
  * Foreground service of type mediaProjection: from Android 14 on, projection
  * consent must exist before the service enters the foreground with this type,
@@ -34,8 +35,10 @@ class LiveService : Service() {
     private var lowLatencyLock: WifiManager.WifiLock? = null
 
     private val handler = Handler(Looper.getMainLooper())
-    private var streamUrl: String? = null
-    private var sonos: Sonos? = null
+    @Volatile
+    private var endpoint: StreamEndpoint? = null
+    @Volatile
+    private var driver: SpeakerDriver? = null
 
     private var standardMode = false
 
@@ -97,21 +100,22 @@ class LiveService : Service() {
         // For the emulator, the stream address can be set by hand
         // (the Sonos only reaches the emulator through host port forwarding).
         val base = AppState.streamBaseOverride.value.ifBlank { "http://$ip:${srv.port}" }
-        streamUrl = "$base${LiveStreamServer.PATH}"
-        AppState.streamUrl.value = streamUrl
+        val stream = StreamEndpoint(base, srv, ip)
+        endpoint = stream
+        AppState.streamUrl.value = stream.url
 
         // Clear the old message now, not after starting: capture runs in its
         // own thread and can fail before that.
         AppState.message.value = null
-        // Only the Sonos speakers may fetch the stream, not every device on the
-        // Wi-Fi. With a hand-set address (emulator port forwarding) anyone may.
-        // A Sonos the search did not list (say, a group member that fetches
-        // for the coordinator) is recognised by its device description.
+        // Only the speaker may fetch the stream, not every device on the Wi-Fi.
+        // With a hand-set address (emulator port forwarding) anyone may. Who else
+        // counts as the speaker (say, a group member that fetches for the
+        // coordinator) is up to its driver. AirPlay is sent the audio instead,
+        // so with it nobody needs to fetch anything.
         if (AppState.streamBaseOverride.value.isBlank()) {
             srv.allowPeer = { peer ->
-                peer == speaker.ip || peer == coordinatorIp ||
-                    AppState.speakers.value.any { it.ip == peer } ||
-                    sonosPeers.getOrPut(peer) { Ssdp.probe(peer) != null }
+                val active = driver
+                active != null && active.pullsStream && (peer == speaker.ip || active.allowsPeer(peer))
             }
         }
 
@@ -146,7 +150,7 @@ class LiveService : Service() {
         }
 
         AppState.running.value = true
-        pointSonosAtStream()
+        pointSpeakerAtStream()
         startWatchdog()
         // Not sticky: after a crash the system would restart the service without
         // the capture consent, and it would only send silence.
@@ -158,92 +162,164 @@ class LiveService : Service() {
         super.onDestroy()
     }
 
-    // ---- Sonos ------------------------------------------------------------
-
-    @Volatile
-    private var coordinatorIp: String? = null
-
-    private val sonosPeers = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+    // ---- Speaker ----------------------------------------------------------
 
     /**
-     * True while the Sonos is being pointed at the stream or checked. Play can
-     * take many seconds to answer; a second SetAVTransportURI from the
-     * watchdog in that time would restart the speaker's connection attempt.
+     * True while the speaker is being pointed at the stream or checked. Play can
+     * take many seconds to answer; a second one from the watchdog in that time
+     * would restart the speaker's connection attempt.
      */
-    private val sonosBusy = java.util.concurrent.atomic.AtomicBoolean(false)
-    @Volatile
-    private var repoints = 0
+    private val speakerBusy = java.util.concurrent.atomic.AtomicBoolean(false)
+    private var lastSpeakerState = ""
+    private var lastCheckError = ""
+    private var ticks = 0
+    private var playingChecks = 0
 
-    private fun pointSonosAtStream() {
+    /** The device's ways in that have not had their turn in this stream. */
+    private val untried = ArrayDeque<Speaker>()
+    private var firstFailure: Exception? = null
+    private var firstFailurePulled = true
+    @Volatile
+    private var playingTo: Speaker? = null
+
+    /**
+     * Starts with the way that worked last time, or the one the search put first.
+     * The other ways of a device get their turn if it will not play.
+     */
+    private fun pointSpeakerAtStream() {
         val speaker = AppState.selected.value ?: return
-        val url = streamUrl ?: return
-        val srv = server ?: return
-        sonosBusy.set(true)
+        val remembered = Remembered(this).get(wayKey(speaker))
+        val ways = (listOf(speaker) + speaker.alternatives).sortedByDescending { it.protocol.name == remembered }
+        untried.clear()
+        untried.addAll(ways)
+        firstFailure = null
+        speakerBusy.set(true)
         AppState.scope.launch {
             try {
-                // In a group, only the coordinator accepts the source.
-                val ip = runCatching { Sonos(speaker).coordinatorIp() }.getOrDefault(speaker.ip)
-                coordinatorIp = ip
-                // Stop was pressed meanwhile: leave the speaker alone.
-                if (!AppState.running.value) return@launch
-                val target = Sonos(speaker.copy(ip = ip))
-                sonos = target
-                AppState.log("Sonos $ip: play $url")
-                target.playStream(url)
-                AppState.log("Sonos $ip: playing")
-                AppState.refreshVolume()
-            } catch (e: Exception) {
-                if (!AppState.running.value) return@launch
-                AppState.log("Sonos: ${e.javaClass.simpleName}: ${e.message}")
-                val requests = srv.streamRequests.get()
-                val refused = synchronized(srv.refusedPeers) { srv.refusedPeers.toList() }
-                val facts = "Stream URL: $url\nStream requests: $requests\n" +
-                    "Refused: ${refused.ifEmpty { listOf("none") }.joinToString()}\n\n" +
-                    e.stackTraceToString()
-                val code = Diagnose.Code.forSpeakerFailure(e, requests)
-                Diagnose.fail(this@LiveService, code, e.message, facts)
+                tryNextWay()
             } finally {
-                sonosBusy.set(false)
+                speakerBusy.set(false)
             }
         }
     }
 
+    private fun wayKey(speaker: Speaker) = "way.${speaker.ip}"
+
+    /** One way after the other, until one has been told to play. Runs off the main thread. */
+    private fun tryNextWay() {
+        val stream = endpoint ?: return
+        while (AppState.running.value) {
+            val candidate = untried.removeFirstOrNull() ?: break
+            val attempt = SpeakerDrivers.driver(this, candidate)
+            driver?.let { previous -> runCatching { previous.stop() } }
+            driver = attempt
+            playingTo = candidate
+            try {
+                attempt.start(stream)
+                AppState.refreshVolume(candidate)
+                return
+            } catch (e: Exception) {
+                if (!AppState.running.value) return
+                AppState.log("${candidate.protocol}: ${e.javaClass.simpleName}: ${e.message}")
+                noteFailure(e, attempt)
+            }
+        }
+        reportFailure(stream)
+        // A Sonos that does not answer is watched until it does, as it always was. The
+        // others have been through everything there is to try.
+        if (playingTo?.protocol != SpeakerProtocol.SONOS) handler.post { stopEverything() }
+    }
+
+    private fun noteFailure(e: Exception, attempt: SpeakerDriver) {
+        // The first failure is the one to report: it is from the way most likely to work.
+        if (firstFailure == null) {
+            firstFailure = e
+            firstFailurePulled = attempt.pullsStream
+        }
+    }
+
+    private fun reportFailure(stream: StreamEndpoint) {
+        val e = firstFailure ?: return
+        val srv = stream.server
+        val requests = srv.streamRequests.get()
+        val refused = synchronized(srv.refusedPeers) { srv.refusedPeers.toList() }
+        val facts = "Stream URL: ${stream.url}\nStream requests: $requests\n" +
+            "Refused: ${refused.ifEmpty { listOf("none") }.joinToString()}\n\n" +
+            e.stackTraceToString()
+        val code = Diagnose.Code.forSpeakerFailure(e, requests, firstFailurePulled)
+        Diagnose.fail(this@LiveService, code, e.message, facts)
+    }
+
     /**
-     * Keeps playback going: if the Sonos switches source (say, from the Sonos
-     * app), we shut down; if it drops to STOPPED, we point it at the stream
-     * again (like "Sonos left our stream -> re-pointing").
+     * Keeps playback going: if the speaker switches source (say, from its own
+     * app), we shut down; if it drops out, we point it at the stream again.
      */
     private fun startWatchdog() {
         handler.postDelayed(object : Runnable {
             override fun run() {
                 if (!AppState.running.value) return
-                val target = sonos
-                val url = streamUrl
-                if (target != null && url != null && sonosBusy.compareAndSet(false, true)) {
+                // Once a minute, so the log shows how things went before something breaks.
+                if (++ticks % 24 == 0) AppState.log("Stream: ${server?.stats()}. ${deviceState()}")
+                val target = driver
+                val stream = endpoint
+                if (target != null && stream != null && speakerBusy.compareAndSet(false, true)) {
                     AppState.scope.launch {
                         try {
-                            val current = target.currentUri()
-                            val state = target.transportState()
-                            if (current.isNotEmpty() && current != url) {
-                                // Someone switched source: end the stream, but do not
-                                // stop the speaker, it is playing the new source now.
-                                sonos = null
-                                handler.post { stopEverything() }
-                            } else if (state == "STOPPED") {
-                                // Logged only a few times, so the report keeps the earlier lines.
-                                if (++repoints <= 3) AppState.log("Sonos stopped: pointing it at the stream again")
-                                target.playStream(url)
+                            val check = target.check(stream)
+                            lastCheckError = ""
+                            when (check) {
+                                is SpeakerCheck.Fine -> {
+                                    if (check.state.isNotEmpty() && check.state != lastSpeakerState) {
+                                        lastSpeakerState = check.state
+                                        AppState.log("Speaker state: ${check.state}")
+                                    }
+                                    if (check.state == "PLAYING" && ++playingChecks == WAY_PROVEN_CHECKS) {
+                                        playingTo?.let { Remembered(this@LiveService).set(wayKey(it), it.protocol.name) }
+                                    }
+                                }
+                                is SpeakerCheck.Restart -> {
+                                    lastSpeakerState = ""
+                                    AppLog.append("Pointing the speaker at the stream again: ${check.reason}")
+                                    target.start(stream)
+                                }
+                                SpeakerCheck.Left -> {
+                                    AppState.log("The speaker left the stream for another source, stopping")
+                                    // Someone switched source: end the stream, but do not
+                                    // stop the speaker, it is playing the new source now.
+                                    driver = null
+                                    handler.post { stopEverything() }
+                                }
+                                is SpeakerCheck.Failed -> {
+                                    AppState.log("Speaker failed: ${check.reason}")
+                                    noteFailure(check.cause ?: IOException(check.reason), target)
+                                    lastSpeakerState = ""
+                                    playingChecks = 0
+                                    tryNextWay()
+                                }
                             }
                         } catch (e: Exception) {
-                            // Next round tries again.
+                            // Next round tries again. The first failure in a row is worth a line:
+                            // the phone cannot reach the speaker.
+                            val error = "${e.javaClass.simpleName}: ${e.message}"
+                            if (error != lastCheckError) AppState.log("Speaker check failed: $error")
+                            lastCheckError = error
                         } finally {
-                            sonosBusy.set(false)
+                            speakerBusy.set(false)
                         }
                     }
                 }
                 handler.postDelayed(this, 2500)
             }
         }, 2500)
+    }
+
+    private fun deviceState(): String {
+        val power = getSystemService(android.os.PowerManager::class.java)
+        val wifi = applicationContext.getSystemService(WifiManager::class.java)
+        @Suppress("DEPRECATION") val info = wifi?.connectionInfo
+        return "Wi-Fi ${info?.rssi} dBm, ${info?.linkSpeed} Mbit/s, ${info?.frequency} MHz, " +
+            "screen ${if (power.isInteractive) "on" else "off"}, doze ${power.isDeviceIdleMode}, " +
+            "battery saver ${power.isPowerSaveMode}"
     }
 
     // ---- Projection -------------------------------------------------------
@@ -271,10 +347,13 @@ class LiveService : Service() {
     private fun warnIfMediaVolumeLow() {
         val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val volume = am.getStreamVolume(AudioManager.STREAM_MUSIC)
-        if (volume * 2 < am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)) {
-            AppState.log("All apps: media volume is low ($volume)")
-            AppState.message.value = getString(R.string.msg_all_apps_volume)
-        }
+        if (volume * 2 >= am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)) return
+        AppState.log("All apps: media volume is low ($volume)")
+        // A low volume may be on purpose, so say it once. Volume 0 can mean silence: every time.
+        val prefs = prefs(this)
+        if (volume > 0 && prefs.getBoolean(KEY_VOLUME_HINT_SEEN, false)) return
+        prefs.edit().putBoolean(KEY_VOLUME_HINT_SEEN, true).apply()
+        AppState.message.value = getString(R.string.msg_all_apps_volume)
     }
 
     private fun muteMusicStream() {
@@ -298,9 +377,16 @@ class LiveService : Service() {
         AppState.status.value = getString(R.string.status_ready)
         handler.removeCallbacksAndMessages(null)
         // Network: not on the main thread, where it would fail silently.
-        sonos?.let { target -> AppState.scope.launch { runCatching { target.stop() } } }
-        sonos = null
-        coordinatorIp = null
+        driver?.let { target ->
+            AppState.scope.launch {
+                runCatching { target.stop() }
+                // AirPlay has a volume only while connected.
+                AppState.refreshVolume()
+            }
+        }
+        driver = null
+        endpoint = null
+        playingTo = null
         engine?.stop()
         engine = null
         server?.stop()
@@ -398,6 +484,10 @@ class LiveService : Service() {
         const val EXTRA_RESULT_CODE = "resultCode"
         const val EXTRA_RESULT_DATA = "resultData"
         private const val KEY_SAVED_VOLUME = "savedMusicVolume"
+        private const val KEY_VOLUME_HINT_SEEN = "volumeHintSeen"
+
+        /** After about half a minute of playing, this way counts as the one for this device. */
+        private const val WAY_PROVEN_CHECKS = 12
 
         private fun prefs(context: Context) =
             context.getSharedPreferences("sonoslive", Context.MODE_PRIVATE)

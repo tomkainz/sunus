@@ -6,7 +6,7 @@ An Android app that plays your phone's audio live on a Sonos speaker. The phone 
 
 The first Sonos Bridge needed a Linux machine as the Bluetooth receiver. Here the phone does that job itself.
 
-Current release: version 1.5, beta.
+Current release: version 1.6, beta. The new connections to UPnP, Google Cast and AirPlay speakers (such as HomePod) are alpha: they may not work on every speaker yet.
 
 ## Built with AI
 

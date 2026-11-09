@@ -21,7 +21,7 @@
     <string name="status_live_standard">Live (Standard)</string>
     <string name="status_live_all_apps">Live (all apps)</string>
     <string name="empty_searching">Searching Wi-Fi…</string>
-    <string name="empty_none">No Sonos found</string>
+    <string name="empty_none">No speaker found</string>
     <string name="empty_hint">Tap to search · IP under ⋯</string>
 
     <!-- Messages -->
@@ -32,7 +32,7 @@
     <string name="msg_need_record">Allow the microphone/recording permission for Standard mode.</string>
     <string name="msg_need_network">Without the local network permission the app can\'t find any speaker.</string>
     <string name="msg_no_speaker">No speaker selected.</string>
-    <string name="msg_no_sonos_at">No Sonos answers at %1$s.</string>
+    <string name="msg_no_speaker_at">No speaker answers at %1$s.</string>
     <string name="msg_volume_error">Volume: %1$s</string>
     <string name="msg_eq_error">Sound: %1$s</string>
     <string name="section_speaker">Speaker</string>
@@ -65,17 +65,17 @@
     <!-- More -->
     <string name="more_ip">Speaker by IP</string>
     <string name="ok">OK</string>
-    <string name="more_now_playing">Show what\'s playing</string>
-    <string name="more_now_playing_hint">Title and controls of the app that\'s playing. Android calls this notification access; Sunus only uses the media controls and does not read your notifications. If Android blocks it: App info &gt; ⋮ &gt; Allow restricted settings.</string>
+    <string name="more_now_playing">Show title and cover</string>
+    <string name="more_now_playing_hint">Play, pause and skip work without this. For title and cover Android asks for notification access; Sunus only uses the media controls and does not read your notifications. If Android blocks it: App info &gt; ⋮ &gt; Allow restricted settings.</string>
     <string name="more_automation">Control by other apps</string>
     <string name="more_automation_hint">Tasker, Home Assistant and others can start and stop the stream and pick a speaker. Any app on this phone could do that, so leave it off if you don\'t need it.</string>
     <string name="auto_off">Sunus: control by other apps is off. You can turn it on under ⋯.</string>
     <string name="auto_no_speaker">Sunus: no speaker found for %1$s.</string>
-    <string name="msg_all_apps_volume">In All apps mode, the phone\'s media volume can limit how loud the speaker plays. If the sound is quiet or missing, turn it up.</string>
+    <string name="msg_all_apps_volume">All apps: if the sound is quiet or missing, turn up the phone\'s media volume.</string>
     <string name="more_mute">Mute phone</string>
     <string name="more_mute_hint">Standard mode only (All apps is always silent)</string>
-    <string name="hint_upnp">In the Sonos app, UPnP must be on under Account &gt; Privacy &amp; Security &gt; Connection Security (default).</string>
-    <string name="hint_lossless">Lossless (PCM). Audio reaches the Sonos a little later: ideal for music, not lip-synced for video.</string>
+    <string name="hint_upnp">On Sonos speakers: in the Sonos app, UPnP must be on under Account &gt; Privacy &amp; Security &gt; Connection Security (default).</string>
+    <string name="hint_lossless">Lossless (PCM). Audio reaches the speaker a little later: ideal for music, not lip-synced for video.</string>
     <string name="hint_all_apps">All apps: turn on \"Wireless debugging\" in Developer options once and pair. No root needed. After that the app turns it back on by itself, even after a reboot. Developer options must stay on; if Android asks about the Wi-Fi network, tick \"Always allow on this network\".</string>
     <string name="last_report">Last error report</string>
     <string name="share">Share</string>
@@ -119,7 +119,7 @@
     <string name="adb_not_found">Wireless debugging not found. Is it on and is Wi-Fi connected?</string>
 
     <!-- Stream notification -->
-    <string name="notif_live_text">Phone audio is playing on the Sonos</string>
+    <string name="notif_live_text">Phone audio is playing on the speaker</string>
     <string name="notif_stop">Stop</string>
 
     <!-- Error codes and report -->
@@ -134,8 +134,8 @@
     <string name="code_s3">No consent to capture.</string>
     <string name="code_d1">No Wi-Fi address. Is the phone on Wi-Fi?</string>
     <string name="code_d2">Stream server does not start.</string>
-    <string name="code_d3">The Sonos does not accept the stream.</string>
-    <string name="code_d4">The Sonos can\'t reach the stream on the phone. Are both on the same network (no guest Wi-Fi, no VPN)?</string>
+    <string name="code_d3">The speaker does not accept the stream.</string>
+    <string name="code_d4">The speaker can\'t reach the stream on the phone. Are both on the same network (no guest Wi-Fi, no VPN)?</string>
     <string name="code_d5">The phone can\'t reach the speaker.</string>
     <string name="code_x1">The app crashed.</string>
     <string name="help_a1">Turn on Wireless debugging in Developer options, allow it for this Wi-Fi if Android asks, and try again. Standard mode works without it.</string>
@@ -146,11 +146,29 @@
     <string name="help_s3">Confirm Android\'s capture prompt when starting. Once All apps is set up, the prompt no longer appears.</string>
     <string name="help_d1">Connect the phone to the same Wi-Fi as the speaker.</string>
     <string name="help_d2">Close the app completely and open it again.</string>
-    <string name="help_d3">Check in the Sonos app that UPnP is on, then try again. If you have another speaker, try that one too.</string>
+    <string name="help_d3">On a Sonos, check in the Sonos app that UPnP is on, then try again. If you have another speaker, try that one too.</string>
     <string name="help_d4">Turn off any VPN and check the phone\'s local network permission for Sunus.</string>
+    <string name="code_d6">The speaker does not let this phone play.</string>
+    <string name="help_d6">On a HomePod: in the Home app, under Home Settings, set speaker access to anyone on the same network. Speakers that ask for a code or password can\'t be used yet.</string>
     <string name="help_d5">Check that the speaker is on and in the same Wi-Fi, then search for speakers again.</string>
     <string name="help_x1">Please share the report so the crash can be fixed.</string>
     <string name="report_share_title">Share error report</string>
     <string name="report_saved">Saved to Downloads/%1$s</string>
     <string name="report_save_failed">Saving failed: %1$s</string>
+
+    <string name="status_connected">Connected</string>
+    <string name="status_connected_silent">Connected · silent</string>
+    <string name="status_waiting_speaker">Waiting for the speaker…</string>
+    <string name="now_nothing">Nothing playing</string>
+    <string name="now_enable_title">Show title and cover</string>
+    <string name="now_enable_hint">Tap to turn on</string>
+    <string name="power_start">Start streaming</string>
+    <string name="power_stop">Stop streaming</string>
+    <string name="action_search">Search for speakers</string>
+    <string name="action_more">More</string>
+    <string name="log_title">Log</string>
+    <string name="log_hint">Available at any time, also without an error. It contains IP addresses, room names and device details.</string>
+    <string name="log_share">Share log</string>
+    <string name="log_building">Creating log…</string>
+    <string name="log_failed">Log failed: %1$s</string>
 </resources>

@@ -18,6 +18,9 @@ class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AppLog.init(filesDir)
+        val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull()
+        AppLog.append("---- App start $version, Android ${Build.VERSION.RELEASE}, ${Build.MANUFACTURER} ${Build.MODEL} ----")
         AppState.init(this)
         Diagnose.init(this)
     }

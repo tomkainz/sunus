@@ -93,6 +93,17 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
+        <!-- The log is shared as a file: as text it could exceed what an Intent may carry. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.logs"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/log_paths" />
+        </provider>
+
     </application>
 
 </manifest>

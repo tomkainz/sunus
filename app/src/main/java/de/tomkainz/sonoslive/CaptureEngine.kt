@@ -57,15 +57,12 @@ class CaptureEngine(
         val helper = shell
         shell = null
         if (helper != null) {
-            // stop() is called on the main thread, where every network access fails
-            // silently (NetworkOnMainThreadException), including closing the stream.
-            Thread({
-                helper.close()
-                AdbManager.stopHelper(context)
-                // Ends Android's "Wireless debugging connected" notice; the next
-                // start reconnects within a fraction of a second.
-                AdbManager.disconnect(context)
-            }, "helper-stop").start()
+            // Only wakes the reading thread. Stopping the helper and closing the
+            // connection is left to that thread (finally in runAllApps), under the
+            // ADB session, so that a quick Start waits for it instead of losing its
+            // connection to it. stop() is called on the main thread, where every
+            // network access fails silently, including closing the stream.
+            Thread({ helper.close() }, "helper-stop").start()
         }
         thread?.interrupt()
         thread = null
@@ -92,11 +89,17 @@ class CaptureEngine(
             val minBuffer = AudioRecord.getMinBufferSize(
                 LiveStreamServer.RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT
             )
-            val recorder = AudioRecord.Builder()
+            fun build(bytes: Int) = AudioRecord.Builder()
                 .setAudioFormat(format)
-                .setBufferSizeInBytes(8 * minBuffer.coerceAtLeast(4096))
+                .setBufferSizeInBytes(bytes)
                 .setAudioPlaybackCaptureConfig(config)
                 .build()
+            // About two seconds, so a reading thread held up for a moment loses nothing.
+            // Should Android refuse that, the old size.
+            val small = 8 * minBuffer.coerceAtLeast(4096)
+            val recorder = runCatching { build(maxOf(2 * LiveStreamServer.BYTES_PER_SEC, small)) }
+                .getOrElse { build(small) }
+            AppState.log("Standard: capture buffer ${recorder.bufferSizeInFrames * 1000L / LiveStreamServer.RATE} ms")
             record = recorder
 
             recorder.startRecording()
@@ -126,8 +129,20 @@ class CaptureEngine(
     private fun runAllApps() {
         raisePriority()
         var process: AdbManager.ShellProcess? = null
+        AppState.status.value = context.getString(R.string.status_connecting_adb)
+        // An earlier run may still be stopping its helper and closing the connection
+        // (about a second after Stop). Wait for that, or it closes ours.
+        val waitStart = System.currentTimeMillis()
+        val owns = AdbManager.beginSession(SESSION_WAIT_MS)
+        val waited = System.currentTimeMillis() - waitStart
+        if (!owns && running) {
+            AppState.log("All apps: earlier run not cleaned up after $waited ms, starting anyway")
+        } else if (waited >= 50) {
+            AppState.log("All apps: waited $waited ms for the earlier run to clean up")
+        }
         try {
-            AppState.status.value = context.getString(R.string.status_connecting_adb)
+            // Stop was pressed while waiting.
+            if (!running) return
             val connected = try {
                 AdbManager.connect(context)
             } catch (e: Exception) {
@@ -175,6 +190,10 @@ class CaptureEngine(
                 }
             }
             AppState.status.value = context.getString(R.string.status_live_all_apps)
+            // Since 1.6-beta12 the helper says how much it can hold while the connection stalls.
+            header.split(" ").getOrNull(3)?.toLongOrNull()?.let {
+                AppState.log("All apps: helper buffer ${it * 1000 / LiveStreamServer.RATE} ms")
+            }
 
             val buffer = ByteArray(1024 * LiveStreamServer.CHANNELS * 2)
             while (running) {
@@ -191,13 +210,18 @@ class CaptureEngine(
             if (running) Diagnose.fail(context, Diagnose.Code.A5, e.message, e.stackTraceToString())
         } finally {
             // Whatever ended the loop, the helper must go, or REMOTE_SUBMIX stays
-            // open and the phone silent. stop() may do the same; that is harmless.
+            // open and the phone silent. This is the only place that does it.
+            // The interrupt from stop() must not break the shell commands below.
+            Thread.interrupted()
             if (process != null) {
                 shell = null
                 runCatching { process.close() }
                 AdbManager.stopHelper(context)
+                // Ends Android's "Wireless debugging connected" notice; the next
+                // start reconnects within a fraction of a second.
                 AdbManager.disconnect(context)
             }
+            if (owns) AdbManager.endSession()
             if (running) onEnded()
         }
     }
@@ -214,6 +238,14 @@ class CaptureEngine(
             if (line.startsWith("PCM ") || line.startsWith("ERR ")) return line
         }
         return null
+    }
+
+    private companion object {
+        /**
+         * Cleanup takes about 1.2 s (stopHelper waits 1 s). Its shell command gives up
+         * after 15 s, so a longer wait only means that run hangs somewhere else.
+         */
+        const val SESSION_WAIT_MS = 20_000L
     }
 
     private fun readAsciiLine(input: java.io.InputStream): String? {
