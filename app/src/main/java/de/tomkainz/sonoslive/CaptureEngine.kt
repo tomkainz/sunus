@@ -129,7 +129,10 @@ class CaptureEngine(
     private fun runAllApps() {
         raisePriority()
         var process: AdbManager.ShellProcess? = null
-        AppState.status.value = context.getString(R.string.status_connecting_adb)
+        AppState.status.value = context.getString(
+            if (de.tomkainz.sonoslive.adb.RootShell.known(context)) R.string.status_connecting_root
+            else R.string.status_connecting_adb
+        )
         // An earlier run may still be stopping its helper and closing the connection
         // (about a second after Stop). Wait for that, or it closes ours.
         val waitStart = System.currentTimeMillis()

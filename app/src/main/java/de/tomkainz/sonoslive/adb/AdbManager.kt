@@ -92,6 +92,7 @@ object AdbManager {
      */
     @Synchronized
     fun connect(context: Context, timeoutMs: Long = 8000): Boolean {
+        if (usesRoot(context)) return true
         val manager = AdbKeyManager.getInstance(context)
         if (manager.isConnected) return true
         val started = SystemClock.elapsedRealtime()
@@ -332,7 +333,8 @@ object AdbManager {
         val wifi = runCatching {
             Settings.Global.getInt(context.contentResolver, ADB_WIFI_ENABLED, 0) == 1
         }.getOrDefault(false)
-        return "Wireless debugging on: $wifi\n" +
+        return "Root (su as shell): ${RootShell.known(context)}\n" +
+            "Wireless debugging on: $wifi\n" +
             "May turn it on itself: ${canWriteSecureSettings(context)}\n" +
             "Capture without dialog (PROJECT_MEDIA): ${hasProjectionPermission(context)}\n" +
             "Connected to ADB: ${isConnected(context)}"
@@ -366,11 +368,22 @@ object AdbManager {
     }
 
     fun isConnected(context: Context): Boolean =
-        runCatching { AdbKeyManager.getInstance(context).isConnected }.getOrDefault(false)
+        RootShell.known(context) ||
+            runCatching { AdbKeyManager.getInstance(context).isConnected }.getOrDefault(false)
 
+    /** Nothing to close with root: every command is a process of its own. */
     fun disconnect(context: Context) {
+        if (RootShell.known(context)) return
         runCatching { AdbKeyManager.getInstance(context).disconnect() }
     }
+
+    /**
+     * Root instead of ADB, if su gives the shell user, also on a phone that was paired
+     * before. Asked once per app run while unknown; once it worked, checked again each
+     * time (quick), so that taking root away falls back to the pairing.
+     */
+    private fun usesRoot(context: Context): Boolean =
+        RootShell.present() && RootShell.check(context, again = RootShell.known(context))
 
     /**
      * Held by one "All apps" run, from connecting until its helper is stopped and the
@@ -405,9 +418,10 @@ object AdbManager {
      * Closing the stream ends the command.
      */
     fun openShell(context: Context, command: String): ShellProcess {
+        if (RootShell.known(context)) return ShellProcess.of(RootShell.start(command))
         val manager = AdbKeyManager.getInstance(context)
         val stream: AdbStream = manager.openStream("shell:$command")
-        return ShellProcess(stream)
+        return ShellProcess.of(stream)
     }
 
     /**
@@ -519,13 +533,27 @@ object AdbManager {
         return de.tomkainz.sonoslive.Net.localIp(context) ?: "127.0.0.1"
     }
 
-    class ShellProcess(private val stream: AdbStream) {
-        val input: InputStream get() = stream.openInputStream()
+    /** A running shell command, over ADB or through su. */
+    class ShellProcess private constructor(
+        private val open: () -> InputStream,
+        private val end: () -> Unit,
+        private val ended: () -> Boolean
+    ) {
+        val input: InputStream get() = open()
 
         fun close() {
-            runCatching { stream.close() }
+            runCatching { end() }
         }
 
-        val isClosed: Boolean get() = stream.isClosed
+        val isClosed: Boolean get() = ended()
+
+        companion object {
+            fun of(stream: AdbStream) = ShellProcess(stream::openInputStream, stream::close) { stream.isClosed }
+
+            fun of(process: java.lang.Process): ShellProcess {
+                val input = process.inputStream
+                return ShellProcess({ input }, process::destroy) { !process.isAlive }
+            }
+        }
     }
 }
