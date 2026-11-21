@@ -18,6 +18,7 @@
     <string name="status_ready">Ready</string>
     <string name="status_scanning">Scanning network…</string>
     <string name="status_connecting_adb">Connecting ADB…</string>
+    <string name="status_connecting_root">Starting via root…</string>
     <string name="status_live_standard">Live (Standard)</string>
     <string name="status_live_all_apps">Live (all apps)</string>
     <string name="empty_searching">Searching Wi-Fi…</string>

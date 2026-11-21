@@ -58,6 +58,9 @@ class AirPlayStreamer(private val host: String) : AudioSink {
 
     @Volatile
     private var running = false
+    @Volatile
+    private var stopped = false
+    private var timingStarted = false
     private val threads = mutableListOf<Thread>()
 
     // For the log.
@@ -112,12 +115,23 @@ class AirPlayStreamer(private val host: String) : AudioSink {
         "$resendAsked resend request(s), $resent resent, $underruns underrun(s), $trims trim(s), " +
         "$timingAnswered time request(s), $socketsReplaced socket(s) replaced, last packet $silentForMs ms ago"
 
+    /**
+     * Answers the speaker's time requests from now on. Needed before the handshake: a Sonos
+     * asks for the time during the stream SETUP and does not answer it until it has one.
+     */
+    @Synchronized
+    fun answerTime() {
+        if (timingStarted || stopped) return
+        timingStarted = true
+        thread("airplay-timing") { timingLoop() }
+    }
+
     fun start(session: AirPlaySession) {
         running = true
         anchor = Anchor(NtpClock.now(), head)
         destination = InetSocketAddress(host, session.dataPort)
         synchronized(audioLock) { audio = openAudio() }
-        thread("airplay-timing") { timingLoop() }
+        answerTime()
         thread("airplay-control") { controlLoop() }
         thread("airplay-sync") { syncLoop(session) }
         lastSent = System.nanoTime()
@@ -127,6 +141,7 @@ class AirPlayStreamer(private val host: String) : AudioSink {
 
     fun stop() {
         running = false
+        stopped = true
         runCatching { control.close() }
         runCatching { timing.close() }
         synchronized(audioLock) {
@@ -247,7 +262,7 @@ class AirPlayStreamer(private val host: String) : AudioSink {
     /** The speaker keeps asking the time, to work out how far its clock is from ours. */
     private fun timingLoop() {
         val buffer = ByteArray(64)
-        while (running) {
+        while (!stopped) {
             val request = DatagramPacket(buffer, buffer.size)
             try {
                 timing.receive(request)
