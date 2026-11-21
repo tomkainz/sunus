@@ -165,7 +165,17 @@ class MainActivity : ComponentActivity() {
             }
             CaptureMode.ALL_APPS -> {
                 if (!AppState.adbPaired.value) {
-                    AppState.requestPairing.value = true
+                    // Rooted: su gives the same shell as ADB, so no pairing and no developer options.
+                    val app = applicationContext
+                    AppState.scope.launch {
+                        if (de.tomkainz.sonoslive.adb.RootShell.check(app, again = true)) {
+                            AppState.setAdbPaired(true)
+                            AppState.requestPairing.value = false
+                            LiveService.startAllApps(app)
+                        } else {
+                            AppState.requestPairing.value = true
+                        }
+                    }
                     return
                 }
                 LiveService.startAllApps(this)
