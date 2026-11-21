@@ -84,6 +84,7 @@ class AirPlayDriver(private val speaker: Speaker) : SpeakerDriver {
         session = s
         val sender = AirPlayStreamer(speaker.ip)
         streamer = sender
+        sender.answerTime()
         s.setup(sender.timingPort, sender.controlPort)
         s.record(sender.firstSequence, sender.firstTimestamp)
         active = s
